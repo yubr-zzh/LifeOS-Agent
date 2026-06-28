@@ -211,8 +211,30 @@ Daily Input
 - Timeline 新增修炼、反馈、Dreaming 节点
 - Harness 展示最新真实 trace 和 memory vault
 
+## Step 11：LLM 化核心节点
+
+**Goal**：将规则模拟升级为可插拔真实模型节点，同时保留规则 fallback，保证路演现场稳定。
+
+交付：
+
+- `.env.example`
+- 后端 `.env` 自动加载
+- DeepSeek/OpenAI-compatible JSON LLM adapter
+- `reflection_generation` LLM 节点
+- `dreaming_synthesis` LLM 节点
+- `GET /api/lifeos/config`
+- trace/dream 记录 `modelCalls`
+- Harness 显示 LLM / vision / model call 状态
+
+验收：
+
+- 未配置 key 时，系统继续使用规则 fallback
+- 配置 key 后，reflection 与 dreaming 由真实 LLM 输出增强
+- API 不返回任何 secret，只返回 `hasApiKey`
+- `npm run check` 通过
+
 ## 后续目标
 
-1. 把规则生成器替换为 LLM generation node。
-2. 将 Harness 页面强化为“工程证据面板”：显示每个节点耗时、输入输出、状态差异。
+1. 将 Harness 页面强化为“工程证据面板”：显示每个节点耗时、输入输出、状态差异。
+2. 接入豆包视觉模型：图片日记、白板截图、学习材料截图进入 multimodal memory。
 3. 准备路演 README、PPT 文案和固定演示脚本。

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mockData } from '../../lib/mockData';
 import { ArrowRight, BrainCircuit, FileText, RefreshCw } from 'lucide-react';
-import { getLatestHarnessTrace, getMemoryFiles, runDemoMode, runDreaming, type DreamReport, type LifeOSRunResponse, type MemoryFile } from '../../lib/api';
+import { getLatestHarnessTrace, getMemoryFiles, getRuntimeConfig, runDemoMode, runDreaming, type DreamReport, type LifeOSRunResponse, type MemoryFile, type RuntimeConfig } from '../../lib/api';
 
 const HarnessPage = () => {
   const [trace, setTrace] = useState<LifeOSRunResponse['harnessTrace']>(mockData.harnessTrace as unknown as LifeOSRunResponse['harnessTrace']);
@@ -15,6 +15,7 @@ const HarnessPage = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [dream, setDream] = useState<DreamReport | null>(null);
   const [memoryFiles, setMemoryFiles] = useState<MemoryFile[]>([]);
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
 
   useEffect(() => {
     const cachedRun = localStorage.getItem('lifeos:lastRun');
@@ -39,6 +40,12 @@ const HarnessPage = () => {
       .then((result) => setMemoryFiles(result.files ?? []))
       .catch((error) => {
         console.warn('LifeOS memory vault unavailable', error);
+      });
+
+    getRuntimeConfig()
+      .then(setRuntimeConfig)
+      .catch((error) => {
+        console.warn('LifeOS runtime config unavailable', error);
       });
   }, []);
 
@@ -140,6 +147,26 @@ const HarnessPage = () => {
             {demoStatus}
           </div>
         )}
+
+        <div className="mb-10 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+            <div className="text-[10px] uppercase tracking-[2px] text-white/35 mb-2">LLM NODE</div>
+            <div className="text-white font-medium">{runtimeConfig?.llm.enabled ? 'DeepSeek 推理在线' : '规则 fallback 模式'}</div>
+            <div className="mt-1 text-xs text-white/35">{runtimeConfig?.llm.model ?? '未连接后端配置'}</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+            <div className="text-[10px] uppercase tracking-[2px] text-white/35 mb-2">VISION NODE</div>
+            <div className="text-white font-medium">{runtimeConfig?.vision.hasApiKey ? '豆包视觉已配置' : '视觉节点待接入'}</div>
+            <div className="mt-1 text-xs text-white/35">{runtimeConfig?.vision.endpointId || 'endpoint 未设置'}</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+            <div className="text-[10px] uppercase tracking-[2px] text-white/35 mb-2">MODEL CALLS</div>
+            <div className="text-white font-medium">{trace.modelCalls?.length ?? 0} 次可观测调用</div>
+            <div className="mt-1 text-xs text-white/35">
+              {trace.modelCalls?.[0] ? `${trace.modelCalls[0].purpose} / ${trace.modelCalls[0].status} / ${trace.modelCalls[0].latencyMs}ms` : '等待下一次 run'}
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-12 gap-6 mb-10">
           <div className="col-span-12 lg:col-span-7 bg-zinc-950 border border-cyan-400/30 rounded-3xl p-8">

@@ -1,6 +1,6 @@
 import http from "node:http";
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +10,22 @@ const SEED_DIR = path.join(__dirname, "data");
 const STATE_DIR = path.join(__dirname, ".lifeos-state");
 const MEMORY_VAULT_DIR = path.join(STATE_DIR, "memory-vault");
 const PORT = Number(process.env.LIFEOS_AGENT_PORT || 4399);
+
+function loadEnvFile(file) {
+  if (!existsSync(file)) return;
+  const content = readFileSync(file, "utf8");
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+    const [rawKey, ...rawValue] = trimmed.split("=");
+    const key = rawKey.trim();
+    const value = rawValue.join("=").trim().replace(/^["']|["']$/g, "");
+    if (key && process.env[key] === undefined) process.env[key] = value;
+  }
+}
+
+loadEnvFile(path.join(__dirname, "..", ".env"));
+loadEnvFile(path.join(__dirname, ".env"));
 
 const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
@@ -21,6 +37,120 @@ const jsonHeaders = {
 const today = () => new Date().toISOString().slice(0, 10);
 const nowIso = () => new Date().toISOString();
 const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value));
+
+function getLlmConfig() {
+  const apiKey = process.env.LIFEOS_LLM_API_KEY || process.env.DEEPSEEK_API_KEY;
+  const enabled = process.env.LIFEOS_LLM_ENABLED !== "false" && Boolean(apiKey);
+  return {
+    enabled,
+    provider: process.env.LIFEOS_LLM_PROVIDER || "deepseek",
+    apiKey,
+    baseUrl: (process.env.LIFEOS_LLM_BASE_URL || "https://api.deepseek.com").replace(/\/+$/g, ""),
+    model: process.env.LIFEOS_LLM_MODEL || "deepseek-chat",
+    timeoutMs: Number(process.env.LIFEOS_LLM_TIMEOUT_MS || 12000)
+  };
+}
+
+function extractJsonObject(content) {
+  if (!content) return null;
+  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : content;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+  if (start < 0 || end < start) return null;
+  try {
+    return JSON.parse(candidate.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+async function callJsonLlm({ purpose, system, user }) {
+  const config = getLlmConfig();
+  if (!config.enabled) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  const started = Date.now();
+
+  try {
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.model,
+        temperature: 0.3,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user }
+        ]
+      }),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(`LLM ${response.status}: ${await response.text()}`);
+    }
+
+    const payload = await response.json();
+    const content = payload.choices?.[0]?.message?.content || "";
+    const json = extractJsonObject(content);
+    if (!json) throw new Error("LLM returned non-JSON content");
+
+    return {
+      json,
+      meta: {
+        purpose,
+        provider: config.provider,
+        model: config.model,
+        latencyMs: Date.now() - started,
+        status: "ok"
+      }
+    };
+  } catch (error) {
+    return {
+      json: null,
+      meta: {
+        purpose,
+        provider: config.provider,
+        model: config.model,
+        latencyMs: Date.now() - started,
+        status: "fallback",
+        error: error instanceof Error ? error.message : String(error)
+      }
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function normalizeStringArray(value, fallback = []) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item).trim()).filter(Boolean)
+    : fallback;
+}
+
+function getRuntimeConfig() {
+  const llm = getLlmConfig();
+  return {
+    llm: {
+      enabled: llm.enabled,
+      provider: llm.provider,
+      baseUrl: llm.baseUrl,
+      model: llm.model,
+      hasApiKey: Boolean(llm.apiKey)
+    },
+    vision: {
+      provider: "doubao",
+      endpointId: process.env.DOUBAO_VISION_ENDPOINT_ID || "",
+      hasApiKey: Boolean(process.env.DOUBAO_API_KEY)
+    }
+  };
+}
 
 async function readJson(name, fallback) {
   const stateFile = path.join(STATE_DIR, name);
@@ -205,7 +335,7 @@ function selectSkills(parsed, skills) {
   return [...ids].map((id) => skills.find((skill) => skill.id === id)).filter(Boolean);
 }
 
-function generateReflection(parsed, memories) {
+function buildRuleReflection(parsed, memories) {
   const hasAfternoonPattern = memories.some((memory) => memory.id === "mem_afternoon_focus");
   const tomorrowPlan = [
     "上午：安排 RAG / Agent Harness 深度学习 60-90 分钟",
@@ -226,6 +356,57 @@ function generateReflection(parsed, memories) {
       : "当前记录已入库，可用于后续成长轨迹分析",
     tomorrowPlan,
     summary: `本次修炼围绕 ${parsed.topics.join("、") || "日常成长"} 展开，系统已完成复盘、心魔识别与下一轮计划生成。`
+  };
+}
+
+async function generateReflection(parsed, memories, selectedSkills) {
+  const fallback = buildRuleReflection(parsed, memories);
+  const result = await callJsonLlm({
+    purpose: "reflection_generation",
+    system: [
+      "你是 LifeOS Agent 的伴随式成长教练节点。",
+      "你要把用户的每日输入、检索记忆和已选择 skills 转换成温和但可执行的复盘。",
+      "必须只返回 JSON，不要 Markdown。"
+    ].join("\n"),
+    user: JSON.stringify({
+      parsedInput: parsed,
+      retrievedMemory: memories.map((memory) => ({
+        id: memory.id,
+        type: memory.type,
+        content: memory.content,
+        confidence: memory.confidence
+      })),
+      selectedSkills: selectedSkills.map((skill) => ({
+        id: skill.id,
+        name: skill.name,
+        params: skill.params
+      })),
+      requiredShape: {
+        achievements: ["string"],
+        heartDemons: ["string"],
+        emotion: "string",
+        projectProgress: "string",
+        tomorrowPlan: ["string"],
+        summary: "string"
+      }
+    })
+  });
+
+  if (!result?.json) {
+    return {
+      ...fallback,
+      modelCalls: result?.meta ? [result.meta] : []
+    };
+  }
+
+  return {
+    achievements: normalizeStringArray(result.json.achievements, fallback.achievements).slice(0, 5),
+    heartDemons: normalizeStringArray(result.json.heartDemons, fallback.heartDemons).slice(0, 5),
+    emotion: String(result.json.emotion || fallback.emotion),
+    projectProgress: String(result.json.projectProgress || fallback.projectProgress),
+    tomorrowPlan: normalizeStringArray(result.json.tomorrowPlan, fallback.tomorrowPlan).slice(0, 5),
+    summary: String(result.json.summary || fallback.summary),
+    modelCalls: [result.meta]
   };
 }
 
@@ -367,6 +548,7 @@ function buildTrace({ input, parsed, retrievedMemory, selectedSkills, reflection
     evaluation,
     memoryUpdates,
     skillEvolution,
+    modelCalls: reflection.modelCalls || [],
     parsedSignals: {
       topics: parsed.topics,
       heartDemons: parsed.heartDemons,
@@ -389,7 +571,7 @@ async function runLifeOSAgent(input) {
   const parsed = parseInput(input);
   const retrievedMemory = retrieveMemory(parsed, memories);
   const selectedSkills = selectSkills(parsed, skills);
-  const reflection = generateReflection(parsed, retrievedMemory);
+  const reflection = await generateReflection(parsed, retrievedMemory, selectedSkills);
   const evaluation = evaluateRun(parsed, selectedSkills, retrievedMemory);
   const memoryUpdates = evolveMemory(parsed, memories);
   const skillEvolution = evolveSkills(parsed, skills, evaluation);
@@ -443,6 +625,67 @@ async function runLifeOSAgent(input) {
     harnessTrace: trace,
     profile: nextProfile,
     dailyLog
+  };
+}
+
+async function enhanceDreamingWithLlm({ profile, recentTraces, recentLogs, observations, memoryProposals, skillProposals, nextExperiments }) {
+  const result = await callJsonLlm({
+    purpose: "dreaming_synthesis",
+    system: [
+      "你是 LifeOS Agent 的 Dreaming 离线反思节点。",
+      "你要从 recent traces/logs 中发现长期模式、技能参数调整建议和下一轮小实验。",
+      "语言要像工程复盘，不要玄学化；修仙元素只作为轻量隐喻。",
+      "必须只返回 JSON，不要 Markdown。"
+    ].join("\n"),
+    user: JSON.stringify({
+      profile: {
+        name: profile.name,
+        overallRealm: profile.overallRealm,
+        totalProgress: profile.totalProgress,
+        subRealms: profile.subRealms
+      },
+      recentTraces: recentTraces.map((trace) => ({
+        traceId: trace.traceId,
+        input: trace.input,
+        parsedSignals: trace.parsedSignals,
+        selectedSkills: trace.selectedSkills,
+        evaluation: trace.evaluation,
+        memoryUpdates: trace.memoryUpdates,
+        skillEvolution: trace.skillEvolution
+      })),
+      recentLogs: recentLogs.map((log) => ({
+        id: log.id,
+        summary: log.summary,
+        achievements: log.achievements,
+        obstacles: log.obstacles,
+        nextActions: log.nextActions
+      })),
+      ruleBasedDraft: {
+        observations,
+        memoryProposals,
+        skillProposals,
+        nextExperiments
+      },
+      requiredShape: {
+        summary: "string",
+        observations: ["string"],
+        memoryProposals: ["string"],
+        skillProposals: ["string"],
+        nextExperiments: ["string"]
+      }
+    })
+  });
+
+  if (!result?.json) return { json: null, meta: result?.meta };
+  return {
+    json: {
+      summary: String(result.json.summary || ""),
+      observations: normalizeStringArray(result.json.observations),
+      memoryProposals: normalizeStringArray(result.json.memoryProposals),
+      skillProposals: normalizeStringArray(result.json.skillProposals),
+      nextExperiments: normalizeStringArray(result.json.nextExperiments)
+    },
+    meta: result.meta
   };
 }
 
@@ -532,7 +775,7 @@ async function runDreaming() {
     "下一次 Journal run 后对比 planDifficulty 与 emotionalSupport 是否改善。"
   ];
 
-  const dream = {
+  let dream = {
     dreamId: `dream_${Date.now()}`,
     timestamp: nowIso(),
     summary: "Dreaming 完成一次离线反思：将近期 Harness traces 压缩为长期记忆、Skill 参数调整和下一轮实验。",
@@ -543,6 +786,33 @@ async function runDreaming() {
     sourceTraceIds: recentTraces.map((trace) => trace.traceId),
     sourceLogIds: recentLogs.map((log) => log.id)
   };
+
+  const llmDream = await enhanceDreamingWithLlm({
+    profile,
+    recentTraces,
+    recentLogs,
+    observations,
+    memoryProposals,
+    skillProposals,
+    nextExperiments
+  });
+
+  if (llmDream?.json) {
+    dream = {
+      ...dream,
+      summary: llmDream.json.summary || dream.summary,
+      observations: llmDream.json.observations.length ? llmDream.json.observations.slice(0, 5) : dream.observations,
+      memoryProposals: llmDream.json.memoryProposals.length ? llmDream.json.memoryProposals.slice(0, 5) : dream.memoryProposals,
+      skillProposals: llmDream.json.skillProposals.length ? llmDream.json.skillProposals.slice(0, 5) : dream.skillProposals,
+      nextExperiments: llmDream.json.nextExperiments.length ? llmDream.json.nextExperiments.slice(0, 5) : dream.nextExperiments,
+      modelCalls: [llmDream.meta]
+    };
+  } else if (llmDream?.meta) {
+    dream = {
+      ...dream,
+      modelCalls: [llmDream.meta]
+    };
+  }
 
   dreams.push(dream);
   await Promise.all([
@@ -723,6 +993,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/api/lifeos/state") {
       send(res, 200, await getState());
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/lifeos/config") {
+      send(res, 200, getRuntimeConfig());
       return;
     }
 

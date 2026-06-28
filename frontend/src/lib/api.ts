@@ -37,6 +37,7 @@ export interface LifeOSRunResponse {
       from: string | number;
       to: string | number;
     }>;
+    modelCalls?: ModelCall[];
   };
   profile: unknown;
   dailyLog: unknown;
@@ -52,6 +53,7 @@ export interface DreamReport {
   nextExperiments: string[];
   sourceTraceIds: string[];
   sourceLogIds: string[];
+  modelCalls?: ModelCall[];
 }
 
 export interface MemoryFile {
@@ -59,7 +61,17 @@ export interface MemoryFile {
   content: string;
 }
 
+export interface ModelCall {
+  purpose: string;
+  provider: string;
+  model: string;
+  latencyMs: number;
+  status: 'ok' | 'fallback';
+  error?: string;
+}
+
 export type HarnessTrace = LifeOSRunResponse['harnessTrace'] & {
+  modelCalls?: ModelCall[];
   parsedSignals?: {
     topics?: string[];
     heartDemons?: string[];
@@ -115,6 +127,21 @@ export interface LifeOSState {
   latestTrace: HarnessTrace | null;
 }
 
+export interface RuntimeConfig {
+  llm: {
+    enabled: boolean;
+    provider: string;
+    baseUrl: string;
+    model: string;
+    hasApiKey: boolean;
+  };
+  vision: {
+    provider: string;
+    endpointId: string;
+    hasApiKey: boolean;
+  };
+}
+
 export interface FeedbackResponse {
   feedback: {
     feedbackId: string;
@@ -166,6 +193,14 @@ export async function getLatestHarnessTrace() {
 
 export async function getLifeOSState(): Promise<LifeOSState> {
   const response = await fetch(`${API_BASE}/api/lifeos/state`);
+  if (!response.ok) {
+    throw new Error(`LifeOS Agent backend returned ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function getRuntimeConfig(): Promise<RuntimeConfig> {
+  const response = await fetch(`${API_BASE}/api/lifeos/config`);
   if (!response.ok) {
     throw new Error(`LifeOS Agent backend returned ${response.status}`);
   }

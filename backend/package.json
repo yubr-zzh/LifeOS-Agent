@@ -10,6 +10,7 @@
     "smoke": "node scripts/smoke.mjs",
     "smoke:dream": "node scripts/smoke-dream.mjs",
     "smoke:feedback": "node scripts/smoke-feedback.mjs",
-    "smoke:demo": "node scripts/smoke-demo.mjs"
+    "smoke:demo": "node scripts/smoke-demo.mjs",
+    "smoke:config": "node scripts/smoke-config.mjs"
   }
 }
