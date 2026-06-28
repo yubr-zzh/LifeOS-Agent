@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mockData } from '../../lib/mockData';
 import { Sparkles } from 'lucide-react';
+import { runLifeOSAgent } from '../../lib/api';
 
 const JournalPage = () => {
   const [input, setInput] = useState(mockData.journalInputExample);
@@ -18,8 +19,7 @@ const JournalPage = () => {
     setResult(null);
     setStreamText('');
 
-    // Simulate streaming analysis
-    const fullText = "正在调用心魔照见法... 检索记忆库... 正在生成周天规划...";
+    const fullText = "正在调用心魔照见法... 检索记忆库... 选择功法 Skills... 生成 Harness Trace...";
     let i = 0;
     
     const interval = setInterval(() => {
@@ -28,8 +28,15 @@ const JournalPage = () => {
         i++;
       } else {
         clearInterval(interval);
-        setTimeout(() => {
-          setResult(mockData.parsedJournal);
+        setTimeout(async () => {
+          try {
+            const run = await runLifeOSAgent(input);
+            localStorage.setItem('lifeos:lastRun', JSON.stringify(run));
+            setResult(run.parsedJournal);
+          } catch (error) {
+            console.warn('LifeOS backend unavailable, falling back to mock data', error);
+            setResult(mockData.parsedJournal);
+          }
           setIsAnalyzing(false);
         }, 600);
       }

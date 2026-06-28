@@ -1,14 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mockData } from '../../lib/mockData';
 import { ArrowRight, RefreshCw } from 'lucide-react';
+import { getLatestHarnessTrace } from '../../lib/api';
 
 const HarnessPage = () => {
-  const [trace] = useState(mockData.harnessTrace);
+  const [trace, setTrace] = useState(mockData.harnessTrace);
   const [isReplaying, setIsReplaying] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
+
+  useEffect(() => {
+    const cachedRun = localStorage.getItem('lifeos:lastRun');
+    if (cachedRun) {
+      try {
+        const parsed = JSON.parse(cachedRun);
+        if (parsed.harnessTrace) setTrace(parsed.harnessTrace);
+      } catch (error) {
+        console.warn('Failed to read cached LifeOS trace', error);
+      }
+    }
+
+    getLatestHarnessTrace()
+      .then((result) => {
+        if (result.trace) setTrace(result.trace);
+      })
+      .catch((error) => {
+        console.warn('LifeOS backend unavailable, using mock trace', error);
+      });
+  }, []);
 
   const replayHarness = () => {
     setIsReplaying(true);
