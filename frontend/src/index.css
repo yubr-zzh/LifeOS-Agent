@@ -1,18 +1,49 @@
 @import "tailwindcss";
 
+:root {
+  color-scheme: dark;
+  --ink: #f7f3e8;
+  --muted: rgba(247, 243, 232, 0.62);
+  --panel: rgba(12, 15, 23, 0.72);
+  --panel-strong: rgba(6, 8, 13, 0.88);
+  --line: rgba(247, 243, 232, 0.12);
+  --jade: #5eead4;
+  --gold: #f6c768;
+  --cinnabar: #fb7185;
+  --indigo: #9f8cff;
+}
+
 @layer base {
+  * {
+    box-sizing: border-box;
+  }
+
   body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    min-width: 1180px;
+    background: #03050a;
+    color: var(--ink);
+    font-family: "Microsoft YaHei UI", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+    letter-spacing: 0;
   }
-  
+
+  button,
+  textarea {
+    font: inherit;
+  }
+
   .custom-scroll::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
-  
+
+  .custom-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
   .custom-scroll::-webkit-scrollbar-thumb {
-    background-color: #64748b;
-    border-radius: 20px;
+    background: rgba(94, 234, 212, 0.35);
+    border-radius: 999px;
   }
 }
 
@@ -21,6 +52,57 @@
   100% { transform: translateX(400%); }
 }
 
+@keyframes slow-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.82); opacity: 0.7; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(18px, -22px, 0); }
+}
+
 .shimmer {
   animation: shimmer 2.5s linear infinite;
+}
+
+.lifeos-shell {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(94, 234, 212, 0.13), transparent 28%),
+    radial-gradient(circle at 88% 12%, rgba(246, 199, 104, 0.11), transparent 28%),
+    linear-gradient(135deg, #03050a 0%, #071019 48%, #04040a 100%);
+}
+
+.lifeos-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.34;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(circle at 50% 30%, black, transparent 72%);
+}
+
+.glass-panel {
+  background: linear-gradient(180deg, rgba(18, 23, 34, 0.78), rgba(7, 9, 14, 0.82));
+  border: 1px solid var(--line);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34), inset 0 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.gold-chip {
+  background: linear-gradient(135deg, rgba(246, 199, 104, 0.95), rgba(255, 239, 178, 0.88));
+  color: #17100a;
+}
+
+.jade-glow {
+  box-shadow: 0 0 44px rgba(94, 234, 212, 0.34);
 }

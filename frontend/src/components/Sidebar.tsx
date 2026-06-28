@@ -1,6 +1,4 @@
-'use client';
-
-import { Home, BookOpen, TrendingUp, Zap } from 'lucide-react';
+import { BookOpen, BrainCircuit, Home, LineChart, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface SidebarProps {
@@ -9,90 +7,77 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { id: 'dashboard', label: '洞府', icon: Home },
-  { id: 'journal', label: '修炼日志', icon: BookOpen },
-  { id: 'timeline', label: '成长轨迹', icon: TrendingUp },
-  { id: 'harness', label: 'Harness 面板', icon: Zap },
+  { id: 'dashboard', label: '洞府总览', hint: 'Realm OS', icon: Home },
+  { id: 'journal', label: '修炼日志', hint: 'Daily Loop', icon: BookOpen },
+  { id: 'timeline', label: '成长轨迹', hint: 'Time River', icon: LineChart },
+  { id: 'harness', label: 'Harness 面板', hint: 'Agent Core', icon: Zap },
 ];
 
 export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
   return (
-    <div className="w-72 bg-black/70 backdrop-blur-2xl border-r border-white/10 flex flex-col h-screen fixed left-0 top-0 z-50 shadow-2xl">
-      {/* Logo Header */}
-      <div className="p-8 border-b border-white/10">
+    <aside className="fixed left-0 top-0 z-50 flex h-screen w-[280px] flex-col border-r border-white/10 bg-[#05070c]/88 px-5 py-6 shadow-[18px_0_80px_rgba(0,0,0,.38)] backdrop-blur-2xl">
+      <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.045] p-5">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-400 flex items-center justify-center shadow-[0_0_25px_-3px] shadow-violet-500">
-            <span className="text-3xl">🌀</span>
+          <div className="relative grid h-14 w-14 place-items-center rounded-2xl border border-teal-200/30 bg-teal-300/10 jade-glow">
+            <BrainCircuit className="h-7 w-7 text-teal-200" />
+            <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-amber-300 shadow-[0_0_18px_rgba(251,191,36,.8)]" />
           </div>
           <div>
-            <div className="text-3xl font-bold tracking-tighter bg-gradient-to-r from-violet-300 to-cyan-300 bg-clip-text text-transparent">
-              LIFEOS
-            </div>
-            <div className="text-[10px] text-white/40 -mt-1 font-mono">AGENT v0.8.4</div>
+            <div className="text-[2rem] font-black leading-none tracking-[-0.04em]">LifeOS</div>
+            <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.28em] text-teal-200/70">伴随式自进化 Agent</div>
           </div>
         </div>
-        <div className="mt-6 text-xs uppercase tracking-[3px] text-white/30 font-medium">修仙智能体</div>
+
+        <div className="mt-5 grid grid-cols-3 gap-2 text-center text-[10px] uppercase tracking-[0.16em] text-white/45">
+          <div className="rounded-xl border border-white/10 bg-black/25 py-2">Memory</div>
+          <div className="rounded-xl border border-white/10 bg-black/25 py-2">Skills</div>
+          <div className="rounded-xl border border-white/10 bg-black/25 py-2">Dreaming</div>
+        </div>
       </div>
 
-      {/* Navigation */}
-      <div className="flex-1 px-4 py-8 space-y-2">
+      <nav className="mt-7 flex-1 space-y-2">
         {navItems.map((item, index) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
-          
+
           return (
             <motion.button
               key={item.id}
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: -16 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.05 }}
+              transition={{ delay: index * 0.045 }}
               onClick={() => onPageChange(item.id)}
-              className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-left transition-all group relative overflow-hidden
-                ${isActive 
-                  ? 'bg-white/10 shadow-[0_0_20px_-8px] shadow-violet-400' 
-                  : 'hover:bg-white/5'
-                }`}
+              className={`group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border px-4 py-4 text-left transition ${
+                isActive
+                  ? 'border-teal-200/25 bg-teal-200/[0.09] text-white shadow-[0_0_32px_rgba(94,234,212,.12)]'
+                  : 'border-transparent text-white/64 hover:border-white/10 hover:bg-white/[0.045] hover:text-white'
+              }`}
             >
-              {isActive && (
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-500/10 to-transparent" />
-              )}
-              
-              <div className={`p-2 rounded-xl transition-colors ${isActive ? 'bg-violet-500 text-white' : 'text-white/60 group-hover:text-violet-300'}`}>
-                <Icon size={22} />
+              {isActive && <div className="absolute inset-y-2 left-0 w-1 rounded-full bg-teal-200" />}
+              <div className={`grid h-11 w-11 place-items-center rounded-xl border transition ${
+                isActive ? 'border-teal-200/30 bg-teal-200/12 text-teal-100' : 'border-white/10 bg-black/20 text-white/45 group-hover:text-teal-100'
+              }`}>
+                <Icon size={20} />
               </div>
-              
-              <div>
-                <div className={`font-medium ${isActive ? 'text-white' : 'text-white/80 group-hover:text-white'}`}>
-                  {item.label}
-                </div>
-                <div className="text-[10px] text-white/30 font-mono">SECTION_{item.id.toUpperCase().slice(0,3)}</div>
+              <div className="min-w-0">
+                <div className="font-semibold">{item.label}</div>
+                <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/32">{item.hint}</div>
               </div>
-              
-              {isActive && (
-                <div className="absolute right-6 w-1.5 h-6 bg-violet-400 rounded-full animate-pulse" />
-              )}
             </motion.button>
           );
         })}
-      </div>
+      </nav>
 
-      {/* Footer Status */}
-      <div className="p-6 border-t border-white/10">
+      <div className="rounded-2xl border border-amber-200/15 bg-amber-200/[0.055] p-4">
         <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-            <span className="text-emerald-400 font-medium">灵脉已连通</span>
-          </div>
-          <div className="text-white/30 font-mono text-[10px]">06.29.26</div>
+          <span className="text-amber-100/80">当前境界</span>
+          <span className="gold-chip rounded-full px-3 py-1 font-semibold">练气六层</span>
         </div>
-        
-        <div className="mt-8 text-[10px] text-center text-white/20 leading-relaxed">
-          道生一<br />
-          一生二<br />
-          二生三<br />
-          三生万物
+        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-black/35">
+          <div className="h-full w-[56%] rounded-full bg-gradient-to-r from-teal-200 via-amber-200 to-rose-300" />
         </div>
+        <div className="mt-3 text-[11px] leading-relaxed text-white/45">稳定执行、复盘质量、项目推进、心魔改善与 Skill 熟练度共同决定成长。</div>
       </div>
-    </div>
+    </aside>
   );
 }

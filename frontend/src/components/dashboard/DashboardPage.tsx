@@ -1,7 +1,6 @@
-'use client';
-
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { Activity, Flame, Sparkles, Target, Waves } from 'lucide-react';
 import { mockData } from '../../lib/mockData';
 import { getLifeOSState, type LifeOSState } from '../../lib/api';
 import { Progress } from './ProgressBar';
@@ -47,7 +46,7 @@ const DashboardPage = () => {
         name: realm.name,
         level: realm.realm,
         progress: realm.progress,
-        color: realm.color ?? '#8b5cf6',
+        color: realm.color ?? '#5eead4',
       })),
       todayTasks: liveTasks?.length ? liveTasks : mockData.todayTasks,
       heartDemons: liveHeartDemons.length
@@ -61,213 +60,166 @@ const DashboardPage = () => {
         ...(state.dreams?.length ? state.dreams[state.dreams.length - 1].nextExperiments : []),
       ].slice(0, 3),
     };
-  }, [latestLog, latestTrace, liveHeartDemons, liveTasks, state]);
+  }, [latestLog, liveHeartDemons, liveTasks, state]);
 
   const { cultivatorName, currentRealm, totalProgress, subRealms, todayTasks, heartDemons, recentBreakthroughs } = dashboard;
 
   return (
-    <div className="p-10 overflow-auto h-screen">
-      {/* Top Header */}
-      <div className="flex justify-between items-start mb-12">
+    <div className="h-screen overflow-auto p-8 pr-10 custom-scroll">
+      <div className="mb-8 flex items-end justify-between">
         <div>
-          <div className="flex items-center gap-4">
-            <div className="text-6xl">🌌</div>
-            <div>
-              <div className="text-5xl font-bold tracking-tighter text-white">{cultivatorName}</div>
-              <div className="flex items-center gap-3 mt-1">
-                <div className="px-5 py-1 bg-gradient-to-r from-amber-400 to-yellow-300 text-black text-sm font-bold rounded-3xl inline-flex items-center gap-2 shadow-inner">
-                  <span className="text-lg">⚔️</span>
-                  {currentRealm}
-                </div>
-                <div className="text-white/40 text-sm font-mono">LV.17 • 灵根：天品</div>
-              </div>
-            </div>
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-200/20 bg-teal-200/8 px-4 py-2 text-xs uppercase tracking-[0.22em] text-teal-100/75">
+            <Sparkles size={14} />
+            Cultivation Console
+          </div>
+          <h1 className="text-6xl font-black tracking-[-0.055em] text-white">{cultivatorName}</h1>
+          <div className="mt-4 flex items-center gap-3">
+            <span className="gold-chip rounded-full px-5 py-2 text-sm font-bold">{currentRealm}</span>
+            <span className="font-mono text-xs uppercase tracking-[0.22em] text-white/35">LifeOS growth state</span>
           </div>
         </div>
 
-        <div className="text-right">
-          <div className="text-white/50 text-sm mb-2 font-medium">今日灵气汲取</div>
-          <div className="flex items-center gap-4">
-            <div className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-br from-cyan-300 to-violet-300">{totalProgress}</div>
-            <div className="text-4xl text-white/30">%</div>
+        <div className="glass-panel w-[300px] rounded-[1.6rem] p-5">
+          <div className="mb-2 flex items-center justify-between text-sm text-white/55">
+            <span>总境界进度</span>
+            <span className="font-mono text-teal-100">{totalProgress}%</span>
           </div>
-          <div className="h-2.5 w-64 bg-white/10 rounded-full mt-4 overflow-hidden">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${totalProgress}%` }}
-              transition={{ duration: 1.8, ease: "easeOut" }}
-              className="h-full bg-gradient-to-r from-cyan-400 via-violet-500 to-fuchsia-500 rounded-full relative"
-            >
-              <div className="absolute inset-0 bg-white/40 animate-[shimmer_2s_infinite]"></div>
-            </motion.div>
-          </div>
+          <Progress value={totalProgress} color="#5eead4" />
+          <div className="mt-3 text-xs text-white/38">由稳定执行、复盘质量、项目推进、心魔改善与 Skill 熟练度共同计算。</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
-        {/* Central Cave - Immersive Scene */}
-        <div className="col-span-12 lg:col-span-7">
-          <div className="relative h-[520px] rounded-3xl overflow-hidden border border-white/10 bg-[#0a0a1f] shadow-2xl">
-            {/* Background gradient + stars */}
-            <div className="absolute inset-0 bg-[radial-gradient(at_center,#1a1a3a_0%,#05050f_70%)]"></div>
-            
-            {/* Floating particles / orbs */}
-            {Array.from({ length: 7 }).map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-3 h-3 bg-white rounded-full shadow-[0_0_30px_#a5b4fc]"
-                style={{
-                  left: `${15 + i * 11}%`,
-                  top: `${22 + (i % 3) * 18}%`,
-                }}
-                animate={{
-                  y: [0, -80, 0],
-                  opacity: [0.3, 0.9, 0.3],
-                  scale: [0.6, 1.2, 0.6]
-                }}
-                transition={{
-                  duration: 4 + i,
-                  repeat: Infinity,
-                  delay: i * 0.4,
-                }}
-              />
-            ))}
+      <div className="grid grid-cols-12 gap-5">
+        <section className="glass-panel relative col-span-12 min-h-[520px] overflow-hidden rounded-[2rem] p-8 lg:col-span-7">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(94,234,212,.22),transparent_28%),radial-gradient(circle_at_52%_48%,rgba(246,199,104,.12),transparent_42%)]" />
+          <div className="absolute left-8 top-8 z-10 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs text-white/50 backdrop-blur-xl">洞府灵核模拟</div>
 
-            {/* Central Glowing Orb */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-              <motion.div 
-                animate={{ 
-                  rotate: 360,
-                  boxShadow: ['0 0 80px 30px #67e8f9', '0 0 120px 50px #c026d3', '0 0 80px 30px #67e8f9']
-                }}
-                transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-                className="w-56 h-56 rounded-full bg-gradient-to-br from-cyan-300 via-purple-400 to-violet-600 flex items-center justify-center relative"
-              >
-                <div className="w-36 h-36 bg-[#0a0a1f] rounded-full flex items-center justify-center">
-                  <div className="text-[120px] drop-shadow-2xl">🌀</div>
-                </div>
-                
-                {/* Inner pulsing rings */}
-                <div className="absolute inset-0 border border-white/30 rounded-full animate-[ping_6s_infinite]"></div>
-                <div className="absolute inset-[18px] border border-white/20 rounded-full animate-[ping_4s_infinite_300ms]"></div>
-              </motion.div>
-            </div>
+          <div className="absolute inset-x-12 bottom-12 top-20">
+            <div className="absolute left-1/2 top-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-teal-200/20" style={{ animation: 'pulse-ring 3.8s ease-out infinite' }} />
+            <div className="absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-amber-200/10" style={{ animation: 'slow-spin 28s linear infinite' }} />
+            <motion.div
+              className="absolute left-1/2 top-1/2 grid h-56 w-56 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-teal-100/35 bg-gradient-to-br from-teal-200 via-cyan-200 to-indigo-300 shadow-[0_0_120px_rgba(94,234,212,.42)]"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+            >
+              <div className="grid h-36 w-36 place-items-center rounded-full bg-[#05070c] text-5xl font-black text-teal-100">OS</div>
+            </motion.div>
 
-            {/* Floating labels */}
-            <div className="absolute top-12 left-12 bg-black/60 backdrop-blur-xl px-6 py-3 rounded-2xl border border-cyan-400/30 text-cyan-200 text-sm font-medium flex items-center gap-3">
-              <div className="w-2 h-2 bg-cyan-400 rounded-full animate-ping"></div>
-              灵气流动稳定
-            </div>
-
-            <div className="absolute bottom-16 right-12 bg-black/60 backdrop-blur-xl px-6 py-4 rounded-3xl border border-amber-400/30 text-amber-200 text-xs max-w-[200px]">
-              <div className="font-mono mb-1 opacity-60">境界波动</div>
-              <div className="text-lg font-semibold text-amber-300">+0.4 灵压</div>
-            </div>
-
-            {/* Cave title overlay */}
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-center">
-              <div className="inline-block px-8 py-2 bg-black/70 text-white/90 text-sm tracking-widest border border-white/10 rounded-3xl font-serif">
-                玄虚洞府
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Today's Tasks */}
-        <div className="col-span-12 lg:col-span-5 space-y-6">
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
-            <div className="flex justify-between items-center mb-6">
-              <div className="uppercase text-xs tracking-widest text-white/50">今日修炼任务</div>
-              <div className="text-emerald-400 text-xs font-medium">4 项 • 2 已完成</div>
-            </div>
-            
-            <div className="space-y-4">
-              {todayTasks.map((task, idx) => (
-                <motion.div 
-                  key={task.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                  className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all border ${task.completed ? 'border-emerald-500/30 bg-emerald-900/20' : 'border-white/10 hover:border-white/30'}`}
+            {subRealms.slice(0, 5).map((realm, index) => {
+              const angle = (index / 5) * Math.PI * 2 - Math.PI / 2;
+              const x = 50 + Math.cos(angle) * 38;
+              const y = 50 + Math.sin(angle) * 34;
+              return (
+                <motion.div
+                  key={realm.name}
+                  className="absolute w-36 rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-xl"
+                  style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
+                  animate={{ y: [0, -8, 0] }}
+                  transition={{ duration: 4 + index * 0.4, repeat: Infinity }}
                 >
-                  <div className={`w-6 h-6 rounded-xl flex-shrink-0 flex items-center justify-center border ${task.completed ? 'bg-emerald-500 border-emerald-500' : 'border-white/30'}`}>
-                    {task.completed && <span className="text-black text-xl leading-none mt-px">✓</span>}
+                  <div className="truncate text-xs text-white/70">{realm.name}</div>
+                  <div className="mt-1 font-mono text-[10px] text-white/35">{realm.level}</div>
+                  <div className="mt-2 h-1 overflow-hidden rounded bg-white/10">
+                    <div className="h-full rounded" style={{ width: `${realm.progress}%`, backgroundColor: realm.color }} />
                   </div>
-                  <div className={`flex-1 text-sm ${task.completed ? 'line-through text-white/50' : 'text-white'}`}>
-                    {task.title}
-                  </div>
-                  <div className="text-[10px] font-mono text-white/30">TASK_{String(idx+1).padStart(2,'0')}</div>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          <div className="absolute bottom-8 left-8 right-8 z-10 grid grid-cols-3 gap-3">
+            {[
+              ['Trace', latestTrace?.traceId ?? 'mock trace'],
+              ['Memory', `${state?.memories?.length ?? 2} entries`],
+              ['Dreams', `${state?.dreams?.length ?? 0} reports`],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-2xl border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-xl">
+                <div className="text-[10px] uppercase tracking-[0.22em] text-white/32">{label}</div>
+                <div className="mt-1 truncate text-sm text-white/78">{value}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="col-span-12 space-y-5 lg:col-span-5">
+          <div className="glass-panel rounded-[2rem] p-6">
+            <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white/80">
+                <Target size={18} className="text-teal-200" />
+                今日修炼任务
+              </div>
+              <span className="rounded-full bg-white/8 px-3 py-1 text-xs text-white/45">{todayTasks.filter((task) => task.completed).length}/{todayTasks.length}</span>
+            </div>
+            <div className="space-y-3">
+              {todayTasks.map((task, index) => (
+                <motion.div
+                  key={task.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.06 }}
+                  className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${
+                    task.completed ? 'border-teal-200/18 bg-teal-200/8 text-white/62' : 'border-white/10 bg-white/[0.035] text-white/86'
+                  }`}
+                >
+                  <span className={`h-2.5 w-2.5 rounded-full ${task.completed ? 'bg-teal-200' : 'bg-amber-200'}`} />
+                  <span className={task.completed ? 'line-through' : ''}>{task.title}</span>
                 </motion.div>
               ))}
             </div>
           </div>
 
-          {/* Heart Demons */}
-          <div className="bg-white/5 border border-red-500/20 rounded-3xl p-8">
-            <div className="uppercase text-xs tracking-widest text-red-400 mb-6 flex items-center gap-2">
-              <span>⚠︎</span> 当前心魔
+          <div className="glass-panel rounded-[2rem] p-6">
+            <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-white/80">
+              <Flame size={18} className="text-rose-300" />
+              当前心魔
             </div>
-            
-            <div className="space-y-5">
-              {heartDemons.map((demon: { name: string; intensity: number }, i: number) => (
-                <div key={i} className="flex items-center gap-4">
-                  <div className="text-red-400 text-xl">☁︎</div>
-                  <div className="flex-1">
-                    <div className="text-white text-sm mb-1.5">{demon.name}</div>
-                    <div className="h-1 bg-white/10 rounded">
-                      <div 
-                        className="h-1 bg-gradient-to-r from-red-400 to-rose-600 rounded transition-all" 
-                        style={{ width: `${demon.intensity}%` }}
-                      />
-                    </div>
+            <div className="space-y-4">
+              {heartDemons.map((demon) => (
+                <div key={demon.name}>
+                  <div className="mb-2 flex items-center justify-between text-sm">
+                    <span className="text-white/72">{demon.name}</span>
+                    <span className="font-mono text-rose-200/80">{demon.intensity}</span>
                   </div>
-                  <div className="font-mono text-xs text-red-400/70 w-8 text-right">{demon.intensity}</div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-gradient-to-r from-amber-200 to-rose-400" style={{ width: `${demon.intensity}%` }} />
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Recent Breakthroughs + Subrealms */}
-        <div className="col-span-12 lg:col-span-7 bg-white/5 border border-white/10 rounded-3xl p-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <div className="text-lg font-medium text-amber-300">近期突破</div>
-              <div className="text-white/40 text-sm">过去 7 日灵感闪现</div>
-            </div>
-            <div className="text-xs bg-amber-400/10 text-amber-400 px-4 py-1 rounded-3xl">+3 突破</div>
+        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-7">
+          <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-white/80">
+            <Waves size={18} className="text-amber-200" />
+            近期突破
           </div>
-          
           <div className="grid grid-cols-3 gap-4">
             {recentBreakthroughs.map((item, index) => (
-              <motion.div 
-                key={index}
-                whileHover={{ scale: 1.03 }}
-                className="bg-black/60 border border-amber-400/30 rounded-2xl p-6 text-sm leading-snug text-amber-100/90 h-full flex items-center"
-              >
-                ✨ {item}
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        {/* Sub Realms Progress */}
-        <div className="col-span-12 lg:col-span-5 bg-white/5 border border-white/10 rounded-3xl p-8">
-          <div className="uppercase text-xs tracking-[1px] text-violet-300 mb-7">子境界进展</div>
-          
-          <div className="space-y-8">
-            {subRealms.map((realm, index) => (
-              <div key={index}>
-                <div className="flex justify-between text-sm mb-3">
-                  <div className="text-white">{realm.name}</div>
-                  <div className="font-medium text-emerald-400">{realm.level}</div>
-                </div>
-                <Progress value={realm.progress} color={realm.color} />
-                <div className="text-right text-[10px] text-white/30 mt-1 font-mono">{realm.progress}%</div>
+              <div key={index} className="rounded-2xl border border-amber-200/15 bg-amber-200/[0.055] p-5 text-sm leading-relaxed text-amber-50/82">
+                {item}
               </div>
             ))}
           </div>
-        </div>
+        </section>
+
+        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-5">
+          <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-white/80">
+            <Activity size={18} className="text-indigo-200" />
+            子境界进度
+          </div>
+          <div className="space-y-5">
+            {subRealms.map((realm) => (
+              <div key={realm.name}>
+                <div className="mb-2 flex justify-between text-sm">
+                  <span className="text-white/78">{realm.name}</span>
+                  <span className="text-white/42">{realm.level}</span>
+                </div>
+                <Progress value={realm.progress} color={realm.color} />
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );

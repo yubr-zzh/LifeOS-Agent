@@ -1,21 +1,44 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+  BrainCircuit,
+  Database,
+  FileText,
+  Gauge,
+  GitCompareArrows,
+  Loader2,
+  MoonStar,
+  Play,
+  RefreshCw,
+  ServerCog,
+  Sparkles,
+  WandSparkles,
+} from 'lucide-react';
 import { mockData } from '../../lib/mockData';
-import { ArrowRight, BrainCircuit, FileText, RefreshCw } from 'lucide-react';
-import { getLatestHarnessTrace, getMemoryFiles, getRuntimeConfig, runDemoMode, runDreaming, type DreamReport, type LifeOSRunResponse, type MemoryFile, type RuntimeConfig } from '../../lib/api';
+import {
+  getLatestHarnessTrace,
+  getMemoryFiles,
+  getRuntimeConfig,
+  runDemoMode,
+  runDreaming,
+  type DreamReport,
+  type HarnessTrace,
+  type MemoryFile,
+  type RuntimeConfig,
+} from '../../lib/api';
+
+const fallbackTrace = mockData.harnessTrace as unknown as HarnessTrace;
 
 const HarnessPage = () => {
-  const [trace, setTrace] = useState<LifeOSRunResponse['harnessTrace']>(mockData.harnessTrace as unknown as LifeOSRunResponse['harnessTrace']);
-  const [isReplaying, setIsReplaying] = useState(false);
-  const [isDreaming, setIsDreaming] = useState(false);
-  const [isDemoRunning, setIsDemoRunning] = useState(false);
-  const [demoStatus, setDemoStatus] = useState<string | null>(null);
-  const [activeStep, setActiveStep] = useState(0);
+  const [trace, setTrace] = useState<HarnessTrace>(fallbackTrace);
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
   const [dream, setDream] = useState<DreamReport | null>(null);
   const [memoryFiles, setMemoryFiles] = useState<MemoryFile[]>([]);
-  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
+  const [activeStep, setActiveStep] = useState(0);
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [isDemoRunning, setIsDemoRunning] = useState(false);
+  const [isDreaming, setIsDreaming] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const cachedRun = localStorage.getItem('lifeos:lastRun');
@@ -32,347 +55,321 @@ const HarnessPage = () => {
       .then((result) => {
         if (result.trace) setTrace(result.trace);
       })
-      .catch((error) => {
-        console.warn('LifeOS backend unavailable, using mock trace', error);
-      });
+      .catch((error) => console.warn('LifeOS trace unavailable, using fallback', error));
 
     getMemoryFiles()
       .then((result) => setMemoryFiles(result.files ?? []))
-      .catch((error) => {
-        console.warn('LifeOS memory vault unavailable', error);
-      });
+      .catch((error) => console.warn('LifeOS memory vault unavailable', error));
 
     getRuntimeConfig()
       .then(setRuntimeConfig)
-      .catch((error) => {
-        console.warn('LifeOS runtime config unavailable', error);
-      });
+      .catch((error) => console.warn('LifeOS runtime config unavailable', error));
   }, []);
 
-  const handleDreaming = async () => {
-    setIsDreaming(true);
-    try {
-      const result = await runDreaming();
-      setDream(result.dream);
-      setMemoryFiles(result.memoryFiles);
-      setDemoStatus(`Dreaming ${result.dream.dreamId} 已写入文件式记忆。`);
-    } catch (error) {
-      console.warn('Dreaming failed', error);
-    } finally {
-      setIsDreaming(false);
-    }
+  const flowSteps = useMemo(
+    () => [
+      {
+        title: 'Daily Input',
+        detail: trace.input,
+        icon: FileText,
+        tone: 'teal',
+      },
+      {
+        title: 'Memory Retrieval',
+        detail: `${trace.retrievedMemory.length} 条长期记忆参与推理`,
+        icon: Database,
+        tone: 'amber',
+      },
+      {
+        title: 'Skill Selection',
+        detail: trace.selectedSkills.map((skill) => skill.name).join(' / '),
+        icon: WandSparkles,
+        tone: 'indigo',
+      },
+      {
+        title: 'Reflection Generation',
+        detail: trace.agentOutput?.reflection ?? '生成复盘与下一轮计划',
+        icon: BrainCircuit,
+        tone: 'teal',
+      },
+      {
+        title: 'Harness Evaluation',
+        detail: Object.entries(trace.evaluation).map(([key, value]) => `${key}: ${value}`).join(' · '),
+        icon: Gauge,
+        tone: 'rose',
+      },
+      {
+        title: 'Evolution',
+        detail: trace.skillEvolution.map((item) => `${item.param}: ${item.from} → ${item.to}`).join(' · '),
+        icon: GitCompareArrows,
+        tone: 'amber',
+      },
+    ],
+    [trace],
+  );
+
+  const replayHarness = () => {
+    setIsReplaying(true);
+    setActiveStep(0);
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index < flowSteps.length) {
+        setActiveStep(index);
+        index += 1;
+      } else {
+        clearInterval(interval);
+        setIsReplaying(false);
+      }
+    }, 520);
   };
 
   const handleDemoMode = async () => {
     setIsDemoRunning(true);
-    setDemoStatus(null);
+    setStatus(null);
     try {
       const result = await runDemoMode();
-      setTrace(result.run.harnessTrace);
+      setTrace(result.run.harnessTrace as HarnessTrace);
       setDream(result.dream);
       setMemoryFiles(result.memoryFiles);
       localStorage.setItem('lifeos:lastRun', JSON.stringify(result.run));
-      setDemoStatus(`Demo 闭环完成：${result.run.harnessTrace.traceId} / ${result.feedback.feedback.feedbackId} / ${result.dream.dreamId}`);
+      setStatus(`Demo 闭环完成：${result.run.harnessTrace.traceId}`);
       replayHarness();
     } catch (error) {
       console.warn('Demo mode failed', error);
-      setDemoStatus('Demo 后端暂不可用，当前仍显示本地 mock 与最近缓存。');
+      setStatus('Demo 后端暂不可用，当前展示 fallback trace。');
     } finally {
       setIsDemoRunning(false);
     }
   };
 
-  const replayHarness = () => {
-    setIsReplaying(true);
-    setActiveStep(0);
-    
-    const steps = [0, 1, 2, 3, 4, 5, 6];
-    let stepIndex = 0;
-
-    const interval = setInterval(() => {
-      if (stepIndex < steps.length) {
-        setActiveStep(steps[stepIndex]);
-        stepIndex++;
-      } else {
-        clearInterval(interval);
-        setIsReplaying(false);
-      }
-    }, 680);
+  const handleDreaming = async () => {
+    setIsDreaming(true);
+    setStatus(null);
+    try {
+      const result = await runDreaming();
+      setDream(result.dream);
+      setMemoryFiles(result.memoryFiles);
+      setStatus(`Dreaming 已完成：${result.dream.dreamId}`);
+    } catch (error) {
+      console.warn('Dreaming failed', error);
+      setStatus('Dreaming 调用失败，请确认后端已启动。');
+    } finally {
+      setIsDreaming(false);
+    }
   };
 
-  const steps = [
-    { title: "用户原始输入", icon: "📜" },
-    { title: "检索 Memory 库", icon: "🧠" },
-    { title: "激活功法 (Skills)", icon: "⚔️" },
-    { title: "Agent 输出结果", icon: "📜" },
-    { title: "多维评估指标", icon: "📊" },
-    { title: "Memory 更新记录", icon: "📝" },
-    { title: "Skill 自我进化", icon: "🌱" },
-  ];
+  const modelCall = trace.modelCalls?.[0] ?? dream?.modelCalls?.[0];
 
   return (
-    <div className="p-10">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-end justify-between mb-12">
-          <div>
-            <div className="font-mono uppercase text-xs text-cyan-400 mb-2 tracking-[4px]">OBSERVABILITY SUITE</div>
-            <h1 className="text-6xl font-bold text-white tracking-[-2px]">Agent Harness</h1>
-            <p className="text-xl text-white/40 mt-3">修仙智能体可观测调试台</p>
+    <div className="h-screen overflow-auto p-8 pr-10 custom-scroll">
+      <div className="mb-8 flex items-end justify-between gap-6">
+        <div>
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-200/20 bg-teal-200/8 px-4 py-2 text-xs uppercase tracking-[0.22em] text-teal-100/75">
+            <ServerCog size={14} />
+            Agent Harness
           </div>
-          
-          <div className="flex flex-wrap justify-end gap-3">
-            <motion.button
-              onClick={handleDemoMode}
-              disabled={isDemoRunning}
-              whileHover={{ scale: 1.05 }}
-              className="flex items-center gap-3 bg-cyan-400 text-black hover:bg-cyan-300 border border-cyan-200/70 px-7 py-4 rounded-2xl text-sm uppercase tracking-wider disabled:opacity-50"
-            >
-              <BrainCircuit className={isDemoRunning ? "animate-pulse" : ""} size={18} />
-              一键演示闭环
-            </motion.button>
-            <motion.button
-              onClick={replayHarness}
-              disabled={isReplaying}
-              whileHover={{ scale: 1.05 }}
-              className="flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/20 px-8 py-4 rounded-2xl text-sm uppercase tracking-wider disabled:opacity-50"
-            >
-              <RefreshCw className={isReplaying ? "animate-spin" : ""} size={18} />
-              重新执行完整流程
-            </motion.button>
-          </div>
+          <h1 className="text-5xl font-black tracking-[-0.045em] text-white">工程证据面板</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/45">
+            展示 LifeOS 不是普通日记应用，而是一个可观测、可反馈、可沉淀记忆、可自进化的 Agent Harness。
+          </p>
         </div>
 
-        {demoStatus && (
-          <div className="mb-8 rounded-2xl border border-cyan-300/30 bg-cyan-400/10 px-6 py-4 text-sm text-cyan-100">
-            {demoStatus}
-          </div>
-        )}
-
-        <div className="mb-10 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-            <div className="text-[10px] uppercase tracking-[2px] text-white/35 mb-2">LLM NODE</div>
-            <div className="text-white font-medium">{runtimeConfig?.llm.enabled ? 'DeepSeek 推理在线' : '规则 fallback 模式'}</div>
-            <div className="mt-1 text-xs text-white/35">{runtimeConfig?.llm.model ?? '未连接后端配置'}</div>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-            <div className="text-[10px] uppercase tracking-[2px] text-white/35 mb-2">VISION NODE</div>
-            <div className="text-white font-medium">{runtimeConfig?.vision.hasApiKey ? '豆包视觉已配置' : '视觉节点待接入'}</div>
-            <div className="mt-1 text-xs text-white/35">{runtimeConfig?.vision.endpointId || 'endpoint 未设置'}</div>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-            <div className="text-[10px] uppercase tracking-[2px] text-white/35 mb-2">MODEL CALLS</div>
-            <div className="text-white font-medium">{trace.modelCalls?.length ?? 0} 次可观测调用</div>
-            <div className="mt-1 text-xs text-white/35">
-              {trace.modelCalls?.[0] ? `${trace.modelCalls[0].purpose} / ${trace.modelCalls[0].status} / ${trace.modelCalls[0].latencyMs}ms` : '等待下一次 run'}
-            </div>
-          </div>
+        <div className="flex gap-3">
+          <button
+            onClick={handleDemoMode}
+            disabled={isDemoRunning}
+            className="flex items-center gap-2 rounded-2xl bg-teal-200 px-5 py-4 font-bold text-black transition hover:bg-teal-100 disabled:opacity-60"
+          >
+            {isDemoRunning ? <Loader2 className="animate-spin" size={18} /> : <Play size={18} />}
+            一键演示闭环
+          </button>
+          <button
+            onClick={replayHarness}
+            disabled={isReplaying}
+            className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-5 py-4 text-white/74 transition hover:border-teal-200/25 hover:text-white disabled:opacity-60"
+          >
+            <RefreshCw className={isReplaying ? 'animate-spin' : ''} size={18} />
+            回放 Trace
+          </button>
         </div>
+      </div>
 
-        <div className="grid grid-cols-12 gap-6 mb-10">
-          <div className="col-span-12 lg:col-span-7 bg-zinc-950 border border-cyan-400/30 rounded-3xl p-8">
-            <div className="flex items-start justify-between gap-6">
-              <div>
-                <div className="flex items-center gap-3 text-cyan-300 text-xs uppercase tracking-[3px] mb-3">
-                  <BrainCircuit size={18} />
-                  DREAMING ENGINE
+      {status && <div className="mb-5 rounded-2xl border border-teal-200/18 bg-teal-200/8 px-5 py-4 text-sm text-teal-50/78">{status}</div>}
+
+      <div className="mb-5 grid grid-cols-4 gap-4">
+        <RuntimeCard
+          title="LLM Node"
+          value={runtimeConfig?.llm.enabled ? 'DeepSeek 在线' : '规则 fallback'}
+          detail={runtimeConfig?.llm.model ?? 'waiting backend'}
+          icon={BrainCircuit}
+        />
+        <RuntimeCard
+          title="Vision Node"
+          value={runtimeConfig?.vision.hasApiKey ? '豆包视觉已配置' : '待接入'}
+          detail={runtimeConfig?.vision.endpointId || 'multimodal memory next'}
+          icon={Sparkles}
+        />
+        <RuntimeCard
+          title="Model Call"
+          value={modelCall ? `${modelCall.status}` : 'none'}
+          detail={modelCall ? `${modelCall.purpose} / ${modelCall.latencyMs}ms` : '等待下一次运行'}
+          icon={ServerCog}
+        />
+        <RuntimeCard
+          title="Trace"
+          value={trace.traceId}
+          detail={new Date(trace.timestamp).toLocaleString()}
+          icon={GitCompareArrows}
+        />
+      </div>
+
+      <div className="grid grid-cols-12 gap-5">
+        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-8">
+          <div className="mb-5 flex items-center justify-between">
+            <div className="text-sm font-semibold text-white/78">执行链路</div>
+            <span className="rounded-full border border-white/10 bg-black/24 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">daily input → evolution</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {flowSteps.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = activeStep === index || (!isReplaying && index <= activeStep);
+              return (
+                <motion.div
+                  key={step.title}
+                  animate={{ opacity: isActive ? 1 : 0.42, scale: isActive ? 1 : 0.985 }}
+                  className={`min-h-[150px] rounded-[1.4rem] border p-5 transition ${
+                    isActive ? 'border-teal-200/22 bg-teal-200/[0.06]' : 'border-white/10 bg-white/[0.03]'
+                  }`}
+                >
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-black/24">
+                      <Icon size={18} className="text-teal-100" />
+                    </div>
+                    <span className="font-mono text-[10px] text-white/35">STEP {String(index + 1).padStart(2, '0')}</span>
+                  </div>
+                  <div className="text-lg font-bold tracking-[-0.02em] text-white">{step.title}</div>
+                  <div className="mt-2 line-clamp-3 text-sm leading-relaxed text-white/52">{step.detail}</div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-4">
+          <div className="mb-5 text-sm font-semibold text-white/78">评估指标</div>
+          <div className="space-y-4">
+            {Object.entries(trace.evaluation).map(([key, value]) => (
+              <div key={key}>
+                <div className="mb-2 flex justify-between text-sm">
+                  <span className="text-white/62">{key}</span>
+                  <span className="font-mono text-teal-100">{Math.round(Number(value) * 100)}%</span>
                 </div>
-                <h2 className="text-3xl font-bold text-white">离线自省与夜间凝练</h2>
-                <p className="text-white/45 mt-3 leading-relaxed">
-                  Dreaming 会读取近期 Harness traces，把白天的行为轨迹压缩成长期记忆、Skill 调参建议和下一轮实验。
-                </p>
+                <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-gradient-to-r from-teal-200 to-amber-200" style={{ width: `${Number(value) * 100}%` }} />
+                </div>
               </div>
-              <motion.button
-                whileHover={{ scale: 1.04 }}
-                onClick={handleDreaming}
-                disabled={isDreaming}
-                className="shrink-0 rounded-2xl border border-cyan-300/30 bg-cyan-400/10 px-6 py-4 text-sm font-medium text-cyan-100 disabled:opacity-50"
-              >
-                {isDreaming ? 'Dreaming...' : '运行 Dreaming'}
-              </motion.button>
+            ))}
+          </div>
+
+          <div className="mt-7 rounded-[1.4rem] border border-amber-200/15 bg-amber-200/[0.055] p-5">
+            <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-amber-100/70">
+              <MoonStar size={15} />
+              Dreaming Engine
             </div>
+            <p className="text-sm leading-relaxed text-white/55">{dream?.summary ?? '离线反思会读取近期 traces，沉淀长期记忆、Skill 调参建议和下一轮实验。'}</p>
+            <button
+              onClick={handleDreaming}
+              disabled={isDreaming}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-200/20 bg-black/22 px-4 py-3 text-sm text-amber-50/78 transition hover:bg-amber-200/10 disabled:opacity-60"
+            >
+              {isDreaming ? <Loader2 className="animate-spin" size={16} /> : <MoonStar size={16} />}
+              运行 Dreaming
+            </button>
+          </div>
+        </section>
 
-            {dream ? (
-              <div className="mt-8 grid gap-5">
-                <div className="rounded-2xl bg-black/50 border border-white/10 p-5 text-white/80">
-                  {dream.summary}
+        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-4">
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white/78">
+            <Database size={18} className="text-amber-200" />
+            Retrieved Memory
+          </div>
+          <div className="space-y-3">
+            {trace.retrievedMemory.map((memory, index) => (
+              <div key={index} className="rounded-2xl border border-white/10 bg-black/22 p-4">
+                <div className="mb-2 flex justify-between gap-3">
+                  <span className="rounded-full bg-white/8 px-2 py-1 font-mono text-[10px] text-white/38">{memory.type}</span>
+                  <span className="font-mono text-xs text-teal-100">{Math.round(memory.confidence * 100)}%</span>
                 </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="rounded-2xl bg-white/5 p-5 border border-white/10">
-                    <div className="text-xs text-cyan-300 mb-3 uppercase">Observations</div>
-                    <div className="space-y-2 text-sm text-white/70">
-                      {dream.observations.map((item) => <div key={item}>• {item}</div>)}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-white/5 p-5 border border-white/10">
-                    <div className="text-xs text-emerald-300 mb-3 uppercase">Next Experiments</div>
-                    <div className="space-y-2 text-sm text-white/70">
-                      {dream.nextExperiments.map((item) => <div key={item}>• {item}</div>)}
-                    </div>
-                  </div>
-                </div>
+                <div className="text-sm leading-relaxed text-white/62">{memory.content}</div>
               </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-4">
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white/78">
+            <WandSparkles size={18} className="text-teal-200" />
+            Selected Skills
+          </div>
+          <div className="space-y-3">
+            {trace.selectedSkills.map((skill) => (
+              <div key={skill.skillId} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                <div className="flex justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-white/84">{skill.name}</div>
+                    <div className="mt-1 font-mono text-[10px] text-white/35">{skill.skillId}</div>
+                  </div>
+                  <div className="font-mono text-sm text-teal-100">{skill.score}</div>
+                </div>
+                <div className="mt-3 text-xs leading-relaxed text-white/42">{skill.trigger}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-4">
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white/78">
+            <FileText size={18} className="text-indigo-200" />
+            File-system Memory
+          </div>
+          <div className="max-h-[320px] space-y-2 overflow-auto pr-1 custom-scroll">
+            {memoryFiles.length ? (
+              memoryFiles.slice(0, 10).map((file) => (
+                <div key={file.path} className="rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+                  <div className="truncate font-mono text-xs text-indigo-100/78">{file.path}</div>
+                  <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-white/38">{file.content.replace(/---[\s\S]*?---/, '').trim().slice(0, 120)}</div>
+                </div>
+              ))
             ) : (
-              <div className="mt-8 rounded-2xl border border-dashed border-white/15 p-6 text-sm text-white/35">
-                运行 Dreaming 后，这里会展示离线反思报告。
-              </div>
+              <div className="rounded-xl border border-dashed border-white/10 p-4 text-sm text-white/35">启动后端后会自动生成 memory vault。</div>
             )}
           </div>
-
-          <div className="col-span-12 lg:col-span-5 bg-zinc-950 border border-violet-400/30 rounded-3xl p-8">
-            <div className="flex items-center gap-3 text-violet-300 text-xs uppercase tracking-[3px] mb-3">
-              <FileText size={18} />
-              FILE-SYSTEM MEMORY
-            </div>
-            <h2 className="text-3xl font-bold text-white">文件式系统内存</h2>
-            <p className="text-white/45 mt-3 leading-relaxed">
-              Memory、Skills、Traces 和 Dreams 会同步为 Markdown，形成可审查、可编辑、可迁移的 Agent 记忆库。
-            </p>
-
-            <div className="mt-7 max-h-72 overflow-auto custom-scroll space-y-2 pr-2">
-              {memoryFiles.length ? memoryFiles.slice(0, 12).map((file) => (
-                <div key={file.path} className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
-                  <div className="font-mono text-xs text-violet-200">{file.path}</div>
-                  <div className="mt-1 text-[11px] text-white/35 line-clamp-2">
-                    {file.content.replace(/---[\s\S]*?---/, '').trim().slice(0, 120)}
-                  </div>
-                </div>
-              )) : (
-                <div className="rounded-2xl border border-dashed border-white/15 p-6 text-sm text-white/35">
-                  后端启动后会自动生成 memory vault 文件。
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-8">
-          {steps.map((stepInfo, idx) => {
-            const isActive = activeStep === idx || (!isReplaying && idx <= 6);
-            return (
-              <motion.div 
-                key={idx}
-                initial={false}
-                animate={{ 
-                  opacity: isActive ? 1 : 0.4,
-                  scale: isActive ? 1 : 0.985 
-                }}
-                className={`border ${isActive ? 'border-violet-400/70 shadow-2xl shadow-violet-500/30' : 'border-white/10'} bg-zinc-950 rounded-3xl overflow-hidden transition-all`}
-              >
-                <div className="px-9 py-6 bg-black/60 flex items-center gap-6 border-b border-white/10">
-                  <div className="text-4xl w-12">{stepInfo.icon}</div>
-                  <div className="flex-1">
-                    <div className="font-semibold text-lg text-white">STEP {idx + 1} — {stepInfo.title}</div>
-                    <div className="text-xs text-white/40 font-mono">trace_001 • 2026-06-29 14:22:09</div>
-                  </div>
-                  {isActive && <div className="text-[10px] px-3 py-1 rounded bg-emerald-400 text-black font-medium">LIVE</div>}
-                </div>
-
-                <div className="p-9 text-sm">
-                  <AnimatePresence mode="wait">
-                    {idx === 0 && (
-                      <div className="font-light text-lg text-white/80 border-l-4 border-violet-400 pl-8 py-2 italic">
-                        “{trace.input}”
-                      </div>
-                    )}
-
-                    {idx === 1 && (
-                      <div className="space-y-6">
-                        {trace.retrievedMemory.map((mem, i) => (
-                          <div key={i} className="flex gap-6 bg-zinc-900 rounded-2xl p-6 border border-white/5">
-                            <div>
-                              <div className="uppercase text-[10px] text-white/40">MEMORY</div>
-                              <div className={`mt-1 text-xs uppercase font-medium px-3 py-px inline-block rounded ${mem.type.includes('pattern') ? 'bg-orange-400/10 text-orange-400' : 'bg-sky-400/10 text-sky-400'}`}>
-                                {mem.type.replace('_', ' ')}
-                              </div>
-                            </div>
-                            <div className="flex-1 text-white/80">{mem.content}</div>
-                            <div className="text-right font-mono text-xs">
-                              <div className="text-emerald-400">{mem.confidence * 100}%</div>
-                              <div className="text-white/30 text-[10px]">{mem.lastUpdated}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {idx === 2 && (
-                      <div className="grid grid-cols-2 gap-4">
-                        {trace.selectedSkills.map((skill, i) => (
-                          <div key={i} className="bg-zinc-900/70 p-6 rounded-2xl border border-white/10">
-                            <div className="flex justify-between">
-                              <div>
-                                <div className="text-lg font-medium text-violet-200">{skill.name}</div>
-                                <div className="font-mono text-xs text-white/50">{skill.skillId}</div>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-4xl font-bold text-white/80 tabular-nums">{skill.score}</div>
-                                <div className="text-[10px] -mt-1 text-white/30">SCORE</div>
-                              </div>
-                            </div>
-                            <div className="mt-8 text-xs text-white/40">触发条件：<span className="text-white/70">{skill.trigger}</span></div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {idx === 3 && (
-                      <div className="bg-black p-8 rounded-2xl text-white/80 text-[15px] leading-relaxed border border-dashed border-white/20">
-                        今日修炼成果已入库。<br/>心魔已被照见，规划已生成。<br/>Memory 同步完成，境界微升。
-                      </div>
-                    )}
-
-                    {idx === 4 && (
-                      <div className="grid grid-cols-3 gap-6">
-                        {Object.entries(trace.evaluation).map(([key, value]) => (
-                          <div key={key} className="bg-zinc-900 rounded-3xl p-8 text-center border border-white/5">
-                            <div className="text-xs uppercase mb-5 text-white/40 tracking-wider">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
-                            <div className="text-7xl font-light text-white tracking-tighter tabular-nums">{value}</div>
-                            <div className="h-2 mt-8 bg-white/10 rounded-full">
-                              <div className="h-2 bg-gradient-to-r from-fuchsia-400 to-cyan-400 rounded-full" style={{ width: `${value * 100}%` }} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {idx === 5 && (
-                      <div className="space-y-4">
-                        {trace.memoryUpdates.map((update, index) => (
-                          <div key={index} className="flex gap-4 items-start bg-emerald-900/20 border border-emerald-400/30 px-8 py-6 rounded-2xl">
-                            <div className="text-3xl text-emerald-400">⟡</div>
-                            <div className="text-emerald-100 text-[15px]">{update}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {idx === 6 && (
-                      <div>
-                        <div className="text-xs font-mono text-white/40 mb-6">SKILL EVOLUTION LOG</div>
-                        {trace.skillEvolution.map((change, index) => (
-                          <div key={index} className="flex items-center gap-8 mb-5 border-l-2 border-white/30 pl-8">
-                            <div className="font-mono text-sm text-white/70 w-56">{change.param}</div>
-                            <div className="flex-1 text-white/50 text-sm">{change.from}</div>
-                            <ArrowRight className="text-violet-400" />
-                            <div className="flex-1 font-medium text-emerald-300 text-sm">{change.to}</div>
-                          </div>
-                        ))}
-                        <div className="text-center text-xs text-white/30 mt-12">Skill 参数已完成自适应优化</div>
-                      </div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-
-        <div className="text-center mt-12 text-xs text-white/30 font-light">
-          Harness 闭环已完整演示 • 所有数据均为模拟
-        </div>
+        </section>
       </div>
     </div>
   );
 };
+
+const RuntimeCard = ({
+  title,
+  value,
+  detail,
+  icon: Icon,
+}: {
+  title: string;
+  value: string;
+  detail: string;
+  icon: typeof BrainCircuit;
+}) => (
+  <div className="glass-panel rounded-[1.4rem] p-5">
+    <div className="mb-4 flex items-center justify-between">
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/35">{title}</div>
+      <Icon size={17} className="text-teal-100/72" />
+    </div>
+    <div className="truncate text-lg font-bold tracking-[-0.02em] text-white">{value}</div>
+    <div className="mt-1 truncate text-xs text-white/38">{detail}</div>
+  </div>
+);
 
 export default HarnessPage;
