@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mockData } from '../../lib/mockData';
 import { ArrowRight, BrainCircuit, FileText, RefreshCw } from 'lucide-react';
-import { getLatestHarnessTrace, getMemoryFiles, runDreaming, type DreamReport, type MemoryFile } from '../../lib/api';
+import { getLatestHarnessTrace, getMemoryFiles, runDemoMode, runDreaming, type DreamReport, type LifeOSRunResponse, type MemoryFile } from '../../lib/api';
 
 const HarnessPage = () => {
-  const [trace, setTrace] = useState(mockData.harnessTrace);
+  const [trace, setTrace] = useState<LifeOSRunResponse['harnessTrace']>(mockData.harnessTrace as unknown as LifeOSRunResponse['harnessTrace']);
   const [isReplaying, setIsReplaying] = useState(false);
   const [isDreaming, setIsDreaming] = useState(false);
+  const [isDemoRunning, setIsDemoRunning] = useState(false);
+  const [demoStatus, setDemoStatus] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(0);
   const [dream, setDream] = useState<DreamReport | null>(null);
   const [memoryFiles, setMemoryFiles] = useState<MemoryFile[]>([]);
@@ -46,10 +48,30 @@ const HarnessPage = () => {
       const result = await runDreaming();
       setDream(result.dream);
       setMemoryFiles(result.memoryFiles);
+      setDemoStatus(`Dreaming ${result.dream.dreamId} 已写入文件式记忆。`);
     } catch (error) {
       console.warn('Dreaming failed', error);
     } finally {
       setIsDreaming(false);
+    }
+  };
+
+  const handleDemoMode = async () => {
+    setIsDemoRunning(true);
+    setDemoStatus(null);
+    try {
+      const result = await runDemoMode();
+      setTrace(result.run.harnessTrace);
+      setDream(result.dream);
+      setMemoryFiles(result.memoryFiles);
+      localStorage.setItem('lifeos:lastRun', JSON.stringify(result.run));
+      setDemoStatus(`Demo 闭环完成：${result.run.harnessTrace.traceId} / ${result.feedback.feedback.feedbackId} / ${result.dream.dreamId}`);
+      replayHarness();
+    } catch (error) {
+      console.warn('Demo mode failed', error);
+      setDemoStatus('Demo 后端暂不可用，当前仍显示本地 mock 与最近缓存。');
+    } finally {
+      setIsDemoRunning(false);
     }
   };
 
@@ -91,16 +113,33 @@ const HarnessPage = () => {
             <p className="text-xl text-white/40 mt-3">修仙智能体可观测调试台</p>
           </div>
           
-          <motion.button 
-            onClick={replayHarness}
-            disabled={isReplaying}
-            whileHover={{ scale: 1.05 }}
-            className="flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/20 px-8 py-4 rounded-2xl text-sm uppercase tracking-wider disabled:opacity-50"
-          >
-            <RefreshCw className={isReplaying ? "animate-spin" : ""} size={18} />
-            重新执行完整流程
-          </motion.button>
+          <div className="flex flex-wrap justify-end gap-3">
+            <motion.button
+              onClick={handleDemoMode}
+              disabled={isDemoRunning}
+              whileHover={{ scale: 1.05 }}
+              className="flex items-center gap-3 bg-cyan-400 text-black hover:bg-cyan-300 border border-cyan-200/70 px-7 py-4 rounded-2xl text-sm uppercase tracking-wider disabled:opacity-50"
+            >
+              <BrainCircuit className={isDemoRunning ? "animate-pulse" : ""} size={18} />
+              一键演示闭环
+            </motion.button>
+            <motion.button
+              onClick={replayHarness}
+              disabled={isReplaying}
+              whileHover={{ scale: 1.05 }}
+              className="flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/20 px-8 py-4 rounded-2xl text-sm uppercase tracking-wider disabled:opacity-50"
+            >
+              <RefreshCw className={isReplaying ? "animate-spin" : ""} size={18} />
+              重新执行完整流程
+            </motion.button>
+          </div>
         </div>
+
+        {demoStatus && (
+          <div className="mb-8 rounded-2xl border border-cyan-300/30 bg-cyan-400/10 px-6 py-4 text-sm text-cyan-100">
+            {demoStatus}
+          </div>
+        )}
 
         <div className="grid grid-cols-12 gap-6 mb-10">
           <div className="col-span-12 lg:col-span-7 bg-zinc-950 border border-cyan-400/30 rounded-3xl p-8">

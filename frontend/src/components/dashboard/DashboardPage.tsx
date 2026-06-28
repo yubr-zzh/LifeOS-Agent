@@ -1,11 +1,69 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { mockData } from '../../lib/mockData';
+import { getLifeOSState, type LifeOSState } from '../../lib/api';
 import { Progress } from './ProgressBar';
 
 const DashboardPage = () => {
-  const { cultivatorName, currentRealm, totalProgress, subRealms, todayTasks, heartDemons, recentBreakthroughs } = mockData;
+  const [state, setState] = useState<LifeOSState | null>(null);
+
+  useEffect(() => {
+    getLifeOSState()
+      .then(setState)
+      .catch((error) => {
+        console.warn('LifeOS state unavailable, using dashboard mock', error);
+      });
+  }, []);
+
+  const latestLog = state?.logs?.length ? state.logs[state.logs.length - 1] : undefined;
+  const latestTrace = state?.latestTrace;
+  const liveHeartDemons: string[] = latestTrace?.parsedSignals?.heartDemons ?? [];
+  const liveTasks = latestLog?.nextActions?.map((title: string, index: number) => ({
+    id: index + 1,
+    title,
+    completed: index === 0,
+  }));
+
+  const dashboard = useMemo(() => {
+    if (!state?.profile) {
+      return {
+        cultivatorName: mockData.cultivatorName,
+        currentRealm: mockData.currentRealm,
+        totalProgress: mockData.totalProgress,
+        subRealms: mockData.subRealms,
+        todayTasks: mockData.todayTasks,
+        heartDemons: mockData.heartDemons,
+        recentBreakthroughs: mockData.recentBreakthroughs,
+      };
+    }
+
+    return {
+      cultivatorName: state.profile.name,
+      currentRealm: state.profile.overallRealm,
+      totalProgress: state.profile.totalProgress,
+      subRealms: state.profile.subRealms.map((realm) => ({
+        name: realm.name,
+        level: realm.realm,
+        progress: realm.progress,
+        color: realm.color ?? '#8b5cf6',
+      })),
+      todayTasks: liveTasks?.length ? liveTasks : mockData.todayTasks,
+      heartDemons: liveHeartDemons.length
+        ? liveHeartDemons.map((name: string, index: number) => ({
+            name,
+            intensity: Math.max(48, 86 - index * 10),
+          }))
+        : mockData.heartDemons,
+      recentBreakthroughs: [
+        ...(latestLog?.achievements ?? []),
+        ...(state.dreams?.length ? state.dreams[state.dreams.length - 1].nextExperiments : []),
+      ].slice(0, 3),
+    };
+  }, [latestLog, latestTrace, liveHeartDemons, liveTasks, state]);
+
+  const { cultivatorName, currentRealm, totalProgress, subRealms, todayTasks, heartDemons, recentBreakthroughs } = dashboard;
 
   return (
     <div className="p-10 overflow-auto h-screen">
@@ -151,7 +209,7 @@ const DashboardPage = () => {
             </div>
             
             <div className="space-y-5">
-              {heartDemons.map((demon, i) => (
+              {heartDemons.map((demon: { name: string; intensity: number }, i: number) => (
                 <div key={i} className="flex items-center gap-4">
                   <div className="text-red-400 text-xl">☁︎</div>
                   <div className="flex-1">

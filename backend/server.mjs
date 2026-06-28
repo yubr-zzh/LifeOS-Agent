@@ -657,6 +657,29 @@ async function submitFeedback({ traceId, rating, planFit = "unknown", adopted = 
   };
 }
 
+async function runDemoMode() {
+  const input = "今天学了 RAG，但是下午刷短视频浪费了两小时。算法题没做完，有点焦虑。晚上看了一点 Agent Harness 的资料，感觉 LifeOS 项目思路清楚了一些。";
+  const run = await runLifeOSAgent(input);
+  const feedback = await submitFeedback({
+    traceId: run.harnessTrace.traceId,
+    rating: "too_hard",
+    planFit: "too_heavy",
+    adopted: "partially",
+    note: "计划方向有用，但任务粒度偏大，明天更适合微任务。"
+  });
+  const dream = await runDreaming();
+  const state = await getState();
+
+  return {
+    input,
+    run,
+    feedback,
+    dream: dream.dream,
+    memoryFiles: dream.memoryFiles,
+    state
+  };
+}
+
 async function getState() {
   const [profile, memories, skills, logs, traces, dreams, feedbacks] = await Promise.all([
     readJson("profile.json", {}),
@@ -728,6 +751,11 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       send(res, 200, await submitFeedback(body));
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/lifeos/demo") {
+      send(res, 200, await runDemoMode());
       return;
     }
 

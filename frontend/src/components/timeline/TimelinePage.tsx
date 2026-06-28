@@ -1,11 +1,63 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { mockData } from '../../lib/mockData';
+import { getLifeOSState, type LifeOSState } from '../../lib/api';
 import ReactECharts from 'echarts-for-react';
 
 const TimelinePage = () => {
-  const { timeline, radarData } = mockData;
+  const [state, setState] = useState<LifeOSState | null>(null);
+
+  useEffect(() => {
+    getLifeOSState()
+      .then(setState)
+      .catch((error) => {
+        console.warn('LifeOS state unavailable, using timeline mock', error);
+      });
+  }, []);
+
+  const liveTimeline = useMemo(() => {
+    if (!state) return mockData.timeline;
+
+    const logNodes = state.logs.slice(-4).map((log, index) => ({
+      id: index + 1,
+      date: log.date,
+      title: '修炼日志入库',
+      type: 'record' as const,
+      description: log.summary || log.rawInput,
+    }));
+
+    const feedbackNodes = state.feedbacks.slice(-3).map((feedback, index) => ({
+      id: 100 + index,
+      date: feedback.timestamp.slice(0, 10),
+      title: '用户反馈触发二次进化',
+      type: 'heart_demon' as const,
+      description: `${feedback.rating} / ${feedback.planFit}：${feedback.note ?? '无备注'}`,
+    }));
+
+    const dreamNodes = state.dreams.slice(-3).map((dream, index) => ({
+      id: 200 + index,
+      date: dream.timestamp.slice(0, 10),
+      title: 'Dreaming 离线凝练',
+      type: 'breakthrough' as const,
+      description: dream.summary,
+    }));
+
+    const nodes = [...logNodes, ...feedbackNodes, ...dreamNodes];
+    return nodes.length ? nodes : mockData.timeline;
+  }, [state]);
+
+  const liveRadarData = useMemo(() => {
+    if (!state?.profile?.subRealms?.length) return mockData.radarData;
+    return {
+      dimensions: state.profile.subRealms.map((realm) => realm.name),
+      values: state.profile.subRealms.map((realm) => realm.progress),
+    };
+  }, [state]);
+
+  const timeline = liveTimeline;
+  const radarData = liveRadarData;
 
   const radarOption = {
     radar: {

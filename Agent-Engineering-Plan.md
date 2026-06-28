@@ -191,9 +191,28 @@ Daily Input
 - `planning.taskGranularity` 变成 `micro`
 - `feedbacks/*.md` 生成反馈记忆文件
 
+## Step 10：一键 Demo Mode 与 Live 可视化
+
+**Goal**：让路演现场稳定复现完整链路，不需要手动依次点 Journal、Feedback、Dreaming。
+
+交付：
+
+- `POST /api/lifeos/demo`
+- 自动执行 `run → feedback → dreaming`
+- 返回 state、trace、feedback、dream、memory files
+- Dashboard 读取 live profile/logs/traces
+- Timeline 读取 live logs/traces/dreams/feedbacks
+- Harness 页面提供一键演示按钮
+
+验收：
+
+- 点击 Harness 的“一键演示完整闭环”
+- Dashboard 总进度和子境界更新
+- Timeline 新增修炼、反馈、Dreaming 节点
+- Harness 展示最新真实 trace 和 memory vault
+
 ## 后续目标
 
 1. 把规则生成器替换为 LLM generation node。
-2. Dashboard / Timeline 读取 live profile、logs 和 traces。
-3. 增加一键 Demo Mode，现场稳定复现完整链路。
-4. 将 Harness 页面强化为“工程证据面板”：显示每个节点耗时、输入输出、状态差异。
+2. 将 Harness 页面强化为“工程证据面板”：显示每个节点耗时、输入输出、状态差异。
+3. 准备路演 README、PPT 文案和固定演示脚本。
