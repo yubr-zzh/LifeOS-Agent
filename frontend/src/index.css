@@ -11,6 +11,15 @@
   --gold: #f6c768;
   --cinnabar: #fb7185;
   --indigo: #9f8cff;
+  --shell-bg:
+    radial-gradient(circle at 18% 0%, rgba(94, 234, 212, 0.13), transparent 28%),
+    radial-gradient(circle at 88% 12%, rgba(246, 199, 104, 0.11), transparent 28%),
+    linear-gradient(135deg, #03050a 0%, #071019 48%, #04040a 100%);
+  --grid-color: rgba(255, 255, 255, 0.04);
+  --panel-bg: linear-gradient(180deg, rgba(18, 23, 34, 0.78), rgba(7, 9, 14, 0.82));
+  --panel-shadow: 0 28px 90px rgba(0, 0, 0, 0.34), inset 0 1px rgba(255, 255, 255, 0.08);
+  --sidebar-bg: rgba(5, 7, 12, 0.88);
+  --theme-filter: none;
 }
 
 @layer base {
@@ -72,10 +81,10 @@
 }
 
 .lifeos-shell {
-  background:
-    radial-gradient(circle at 18% 0%, rgba(94, 234, 212, 0.13), transparent 28%),
-    radial-gradient(circle at 88% 12%, rgba(246, 199, 104, 0.11), transparent 28%),
-    linear-gradient(135deg, #03050a 0%, #071019 48%, #04040a 100%);
+  color: var(--ink);
+  background: var(--shell-bg);
+  filter: var(--theme-filter);
+  transition: background 240ms ease, color 240ms ease, filter 240ms ease;
 }
 
 .lifeos-shell::before {
@@ -85,17 +94,31 @@
   pointer-events: none;
   opacity: 0.34;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
   background-size: 56px 56px;
   mask-image: radial-gradient(circle at 50% 30%, black, transparent 72%);
 }
 
+.lifeos-shell::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--atmosphere-opacity, 0);
+  background: var(--atmosphere, transparent);
+  mix-blend-mode: var(--atmosphere-blend, normal);
+}
+
 .glass-panel {
-  background: linear-gradient(180deg, rgba(18, 23, 34, 0.78), rgba(7, 9, 14, 0.82));
+  background: var(--panel-bg);
   border: 1px solid var(--line);
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34), inset 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: var(--panel-shadow);
   backdrop-filter: blur(18px);
+}
+
+.lifeos-sidebar {
+  background: var(--sidebar-bg) !important;
 }
 
 .gold-chip {
@@ -105,4 +128,106 @@
 
 .jade-glow {
   box-shadow: 0 0 44px rgba(94, 234, 212, 0.34);
+}
+
+.lifeos-shell[data-theme="cyber-ink"] {
+  --ink: #f3fff7;
+  --muted: rgba(243, 255, 247, 0.66);
+  --line: rgba(177, 255, 241, 0.18);
+  --jade: #21f7d2;
+  --gold: #f9d65c;
+  --cinnabar: #ff4fd8;
+  --indigo: #7c5cff;
+  --shell-bg:
+    radial-gradient(circle at 14% 10%, rgba(255, 79, 216, 0.22), transparent 26%),
+    radial-gradient(circle at 82% 8%, rgba(33, 247, 210, 0.2), transparent 24%),
+    radial-gradient(circle at 54% 76%, rgba(249, 214, 92, 0.08), transparent 30%),
+    linear-gradient(135deg, #020208 0%, #06151a 46%, #070310 100%);
+  --grid-color: rgba(33, 247, 210, 0.07);
+  --panel-bg: linear-gradient(180deg, rgba(5, 17, 24, 0.82), rgba(5, 5, 15, 0.88));
+  --panel-shadow: 0 30px 100px rgba(0, 0, 0, 0.46), 0 0 42px rgba(33, 247, 210, 0.08), inset 0 1px rgba(255, 255, 255, 0.09);
+  --sidebar-bg: rgba(2, 5, 12, 0.9);
+  --atmosphere:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 1px, transparent 1px 5px),
+    radial-gradient(circle at 30% 24%, rgba(255, 79, 216, .18), transparent 22%),
+    radial-gradient(circle at 70% 70%, rgba(33, 247, 210, .16), transparent 26%);
+  --atmosphere-opacity: 0.2;
+  --atmosphere-blend: screen;
+}
+
+.lifeos-shell[data-theme="aurora"] {
+  --ink: #f8f7ff;
+  --muted: rgba(248, 247, 255, 0.68);
+  --line: rgba(216, 210, 255, 0.16);
+  --jade: #93c5fd;
+  --gold: #f0abfc;
+  --cinnabar: #fb7185;
+  --indigo: #c4b5fd;
+  --shell-bg:
+    radial-gradient(circle at 12% 5%, rgba(96, 165, 250, 0.24), transparent 30%),
+    radial-gradient(circle at 86% 10%, rgba(192, 132, 252, 0.26), transparent 28%),
+    radial-gradient(circle at 60% 82%, rgba(45, 212, 191, 0.11), transparent 34%),
+    linear-gradient(135deg, #07081d 0%, #171044 46%, #080917 100%);
+  --grid-color: rgba(196, 181, 253, 0.055);
+  --panel-bg: linear-gradient(180deg, rgba(23, 20, 58, 0.78), rgba(8, 10, 28, 0.86));
+  --panel-shadow: 0 28px 90px rgba(10, 8, 40, 0.42), 0 0 64px rgba(124, 92, 255, 0.1), inset 0 1px rgba(255, 255, 255, 0.1);
+  --sidebar-bg: rgba(9, 9, 28, 0.9);
+  --atmosphere: radial-gradient(circle at 50% 0%, rgba(147, 197, 253, .2), transparent 32%);
+  --atmosphere-opacity: 0.28;
+  --atmosphere-blend: screen;
+}
+
+.lifeos-shell[data-theme="dark"] {
+  --shell-bg:
+    radial-gradient(circle at 18% 0%, rgba(94, 234, 212, 0.13), transparent 28%),
+    radial-gradient(circle at 88% 12%, rgba(246, 199, 104, 0.11), transparent 28%),
+    linear-gradient(135deg, #03050a 0%, #071019 48%, #04040a 100%);
+}
+
+.lifeos-shell[data-theme="light"] {
+  color-scheme: light;
+  --ink: #14202c;
+  --muted: rgba(20, 32, 44, 0.62);
+  --line: rgba(15, 23, 42, 0.11);
+  --jade: #0f766e;
+  --gold: #b7791f;
+  --cinnabar: #be123c;
+  --indigo: #5b21b6;
+  --shell-bg:
+    radial-gradient(circle at 14% 4%, rgba(14, 116, 144, 0.12), transparent 30%),
+    radial-gradient(circle at 88% 8%, rgba(180, 83, 9, 0.1), transparent 28%),
+    linear-gradient(135deg, #f7f5ee 0%, #eef7f4 48%, #f9f6ed 100%);
+  --grid-color: rgba(15, 23, 42, 0.055);
+  --panel-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(245, 248, 244, 0.86));
+  --panel-shadow: 0 24px 70px rgba(24, 43, 58, 0.12), inset 0 1px rgba(255, 255, 255, 0.9);
+  --sidebar-bg: rgba(255, 255, 255, 0.82);
+  --atmosphere: radial-gradient(circle at 42% 18%, rgba(14, 116, 144, .08), transparent 30%);
+  --atmosphere-opacity: 0.55;
+}
+
+.lifeos-shell[data-theme="light"] [class*="text-white"] {
+  color: rgba(20, 32, 44, 0.72) !important;
+}
+
+.lifeos-shell[data-theme="light"] .text-white,
+.lifeos-shell[data-theme="light"] h1,
+.lifeos-shell[data-theme="light"] h2 {
+  color: #14202c !important;
+}
+
+.lifeos-shell[data-theme="light"] [class*="border-white"] {
+  border-color: rgba(15, 23, 42, 0.11) !important;
+}
+
+.lifeos-shell[data-theme="light"] [class*="bg-black"] {
+  background-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.lifeos-shell[data-theme="light"] [class*="bg-white"] {
+  background-color: rgba(15, 23, 42, 0.045) !important;
+}
+
+.lifeos-shell[data-theme="light"] textarea {
+  color: #14202c !important;
+  background: rgba(255, 255, 255, 0.68) !important;
 }

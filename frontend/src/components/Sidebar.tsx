@@ -1,9 +1,12 @@
-import { BookOpen, BrainCircuit, Home, LineChart, Zap } from 'lucide-react';
+import { BookOpen, BrainCircuit, Home, LineChart, Palette, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
+import type { VisualTheme } from '../App';
 
 interface SidebarProps {
   currentPage: string;
   onPageChange: (page: string) => void;
+  visualTheme: VisualTheme;
+  onThemeChange: (theme: VisualTheme) => void;
 }
 
 const navItems = [
@@ -13,9 +16,16 @@ const navItems = [
   { id: 'harness', label: 'Harness 面板', hint: 'Agent Core', icon: Zap },
 ];
 
-export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
+const themes: Array<{ id: VisualTheme; label: string; hint: string; swatch: string }> = [
+  { id: 'cyber-ink', label: '赛博水墨', hint: 'Cyber Ink', swatch: 'from-fuchsia-400 via-teal-200 to-emerald-300' },
+  { id: 'aurora', label: '蓝紫高级', hint: 'Aurora', swatch: 'from-blue-400 via-violet-400 to-fuchsia-300' },
+  { id: 'dark', label: '玄夜 Dark', hint: 'Current', swatch: 'from-teal-200 via-amber-200 to-rose-300' },
+  { id: 'light', label: '清昼 Light', hint: 'Light', swatch: 'from-sky-200 via-white to-amber-200' },
+];
+
+export default function Sidebar({ currentPage, onPageChange, visualTheme, onThemeChange }: SidebarProps) {
   return (
-    <aside className="fixed left-0 top-0 z-50 flex h-screen w-[280px] flex-col border-r border-white/10 bg-[#05070c]/88 px-5 py-6 shadow-[18px_0_80px_rgba(0,0,0,.38)] backdrop-blur-2xl">
+    <aside className="lifeos-sidebar fixed left-0 top-0 z-50 flex h-screen w-[280px] flex-col border-r border-white/10 bg-[#05070c]/88 px-5 py-6 shadow-[18px_0_80px_rgba(0,0,0,.38)] backdrop-blur-2xl">
       <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.045] p-5">
         <div className="flex items-center gap-4">
           <div className="relative grid h-14 w-14 place-items-center rounded-2xl border border-teal-200/30 bg-teal-300/10 jade-glow">
@@ -68,7 +78,32 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
         })}
       </nav>
 
-      <div className="rounded-2xl border border-amber-200/15 bg-amber-200/[0.055] p-4">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+        <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-white/70">
+          <Palette size={15} />
+          视觉体系主题
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {themes.map((theme) => {
+            const active = visualTheme === theme.id;
+            return (
+              <button
+                key={theme.id}
+                onClick={() => onThemeChange(theme.id)}
+                className={`rounded-xl border p-2 text-left transition ${
+                  active ? 'border-teal-200/35 bg-teal-200/10' : 'border-white/10 bg-black/18 hover:bg-white/[0.055]'
+                }`}
+              >
+                <div className={`mb-2 h-2 rounded-full bg-gradient-to-r ${theme.swatch}`} />
+                <div className="text-xs font-semibold text-white/80">{theme.label}</div>
+                <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/32">{theme.hint}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-amber-200/15 bg-amber-200/[0.055] p-4">
         <div className="flex items-center justify-between text-xs">
           <span className="text-amber-100/80">当前境界</span>
           <span className="gold-chip rounded-full px-3 py-1 font-semibold">练气六层</span>

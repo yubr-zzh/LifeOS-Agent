@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from './components/Sidebar';
 import DashboardPage from './components/dashboard/DashboardPage';
@@ -6,8 +6,18 @@ import JournalPage from './components/journal/JournalPage';
 import TimelinePage from './components/timeline/TimelinePage';
 import HarnessPage from './components/harness/HarnessPage';
 
+export type VisualTheme = 'cyber-ink' | 'aurora' | 'dark' | 'light';
+
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [visualTheme, setVisualTheme] = useState<VisualTheme>(() => {
+    const cached = localStorage.getItem('lifeos:theme') as VisualTheme | null;
+    return cached ?? 'dark';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lifeos:theme', visualTheme);
+  }, [visualTheme]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -23,8 +33,13 @@ export default function App() {
   };
 
   return (
-    <div className="lifeos-shell flex min-h-screen overflow-hidden text-[#f7f3e8]">
-      <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
+    <div data-theme={visualTheme} className="lifeos-shell flex min-h-screen overflow-hidden text-[#f7f3e8]">
+      <Sidebar
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+        visualTheme={visualTheme}
+        onThemeChange={setVisualTheme}
+      />
 
       <main className="relative ml-[280px] flex-1">
         <div className="pointer-events-none fixed right-10 top-8 z-20 flex items-center gap-3 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs text-white/55 backdrop-blur-xl">
