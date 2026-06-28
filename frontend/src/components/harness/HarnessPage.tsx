@@ -3,13 +3,16 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mockData } from '../../lib/mockData';
-import { ArrowRight, RefreshCw } from 'lucide-react';
-import { getLatestHarnessTrace } from '../../lib/api';
+import { ArrowRight, BrainCircuit, FileText, RefreshCw } from 'lucide-react';
+import { getLatestHarnessTrace, getMemoryFiles, runDreaming, type DreamReport, type MemoryFile } from '../../lib/api';
 
 const HarnessPage = () => {
   const [trace, setTrace] = useState(mockData.harnessTrace);
   const [isReplaying, setIsReplaying] = useState(false);
+  const [isDreaming, setIsDreaming] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
+  const [dream, setDream] = useState<DreamReport | null>(null);
+  const [memoryFiles, setMemoryFiles] = useState<MemoryFile[]>([]);
 
   useEffect(() => {
     const cachedRun = localStorage.getItem('lifeos:lastRun');
@@ -29,7 +32,26 @@ const HarnessPage = () => {
       .catch((error) => {
         console.warn('LifeOS backend unavailable, using mock trace', error);
       });
+
+    getMemoryFiles()
+      .then((result) => setMemoryFiles(result.files ?? []))
+      .catch((error) => {
+        console.warn('LifeOS memory vault unavailable', error);
+      });
   }, []);
+
+  const handleDreaming = async () => {
+    setIsDreaming(true);
+    try {
+      const result = await runDreaming();
+      setDream(result.dream);
+      setMemoryFiles(result.memoryFiles);
+    } catch (error) {
+      console.warn('Dreaming failed', error);
+    } finally {
+      setIsDreaming(false);
+    }
+  };
 
   const replayHarness = () => {
     setIsReplaying(true);
@@ -78,6 +100,83 @@ const HarnessPage = () => {
             <RefreshCw className={isReplaying ? "animate-spin" : ""} size={18} />
             重新执行完整流程
           </motion.button>
+        </div>
+
+        <div className="grid grid-cols-12 gap-6 mb-10">
+          <div className="col-span-12 lg:col-span-7 bg-zinc-950 border border-cyan-400/30 rounded-3xl p-8">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <div className="flex items-center gap-3 text-cyan-300 text-xs uppercase tracking-[3px] mb-3">
+                  <BrainCircuit size={18} />
+                  DREAMING ENGINE
+                </div>
+                <h2 className="text-3xl font-bold text-white">离线自省与夜间凝练</h2>
+                <p className="text-white/45 mt-3 leading-relaxed">
+                  Dreaming 会读取近期 Harness traces，把白天的行为轨迹压缩成长期记忆、Skill 调参建议和下一轮实验。
+                </p>
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                onClick={handleDreaming}
+                disabled={isDreaming}
+                className="shrink-0 rounded-2xl border border-cyan-300/30 bg-cyan-400/10 px-6 py-4 text-sm font-medium text-cyan-100 disabled:opacity-50"
+              >
+                {isDreaming ? 'Dreaming...' : '运行 Dreaming'}
+              </motion.button>
+            </div>
+
+            {dream ? (
+              <div className="mt-8 grid gap-5">
+                <div className="rounded-2xl bg-black/50 border border-white/10 p-5 text-white/80">
+                  {dream.summary}
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="rounded-2xl bg-white/5 p-5 border border-white/10">
+                    <div className="text-xs text-cyan-300 mb-3 uppercase">Observations</div>
+                    <div className="space-y-2 text-sm text-white/70">
+                      {dream.observations.map((item) => <div key={item}>• {item}</div>)}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-white/5 p-5 border border-white/10">
+                    <div className="text-xs text-emerald-300 mb-3 uppercase">Next Experiments</div>
+                    <div className="space-y-2 text-sm text-white/70">
+                      {dream.nextExperiments.map((item) => <div key={item}>• {item}</div>)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-8 rounded-2xl border border-dashed border-white/15 p-6 text-sm text-white/35">
+                运行 Dreaming 后，这里会展示离线反思报告。
+              </div>
+            )}
+          </div>
+
+          <div className="col-span-12 lg:col-span-5 bg-zinc-950 border border-violet-400/30 rounded-3xl p-8">
+            <div className="flex items-center gap-3 text-violet-300 text-xs uppercase tracking-[3px] mb-3">
+              <FileText size={18} />
+              FILE-SYSTEM MEMORY
+            </div>
+            <h2 className="text-3xl font-bold text-white">文件式系统内存</h2>
+            <p className="text-white/45 mt-3 leading-relaxed">
+              Memory、Skills、Traces 和 Dreams 会同步为 Markdown，形成可审查、可编辑、可迁移的 Agent 记忆库。
+            </p>
+
+            <div className="mt-7 max-h-72 overflow-auto custom-scroll space-y-2 pr-2">
+              {memoryFiles.length ? memoryFiles.slice(0, 12).map((file) => (
+                <div key={file.path} className="rounded-xl bg-white/5 border border-white/10 px-4 py-3">
+                  <div className="font-mono text-xs text-violet-200">{file.path}</div>
+                  <div className="mt-1 text-[11px] text-white/35 line-clamp-2">
+                    {file.content.replace(/---[\s\S]*?---/, '').trim().slice(0, 120)}
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-dashed border-white/15 p-6 text-sm text-white/35">
+                  后端启动后会自动生成 memory vault 文件。
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="space-y-8">

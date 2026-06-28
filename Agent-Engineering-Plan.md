@@ -128,6 +128,48 @@ Daily Input
 
 ## 下一阶段目标
 
+## Step 7：Dreaming 机制
+
+**Goal**：让 Agent 不只在用户输入时响应，也能在“离线时间”压缩近期轨迹、沉淀长期洞察、提出下一轮实验。
+
+交付：
+
+- `POST /api/lifeos/dream`
+- dream report
+- 从最近 traces/logs 生成 observations
+- 生成 memory proposals
+- 生成 skill proposals
+- 写入文件式 memory vault
+
+验收：
+
+- 先运行一次 `POST /api/lifeos/run`
+- 再运行 `POST /api/lifeos/dream`
+- 返回 dream report
+- `backend/.lifeos-state/memory-vault/dreams/*.md` 出现离线反思文件
+
+## Step 8：文件式系统内存
+
+**Goal**：让 Memory 不只是数据库字段，而是可审查、可编辑、可被 Agent 重新读取的文件系统知识库。
+
+交付：
+
+- `GET /api/lifeos/memory-files`
+- `memory-vault/README.md`
+- `profile.md`
+- `memories/*.md`
+- `skills/*.md`
+- `traces/*.md`
+- `dreams/*.md`
+
+验收：
+
+- 每次 run 后同步 profile/memory/skill/trace 文件
+- 每次 dream 后同步 dream report 文件
+- Harness 页面能展示文件列表和内容摘要
+
+## 后续目标
+
 1. 把规则生成器替换为 LLM generation node。
 2. 增加 feedback endpoint，让用户对计划打分并触发二次 skill evolution。
 3. Dashboard / Timeline 读取 live profile、logs 和 traces。

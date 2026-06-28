@@ -42,6 +42,23 @@ export interface LifeOSRunResponse {
   dailyLog: unknown;
 }
 
+export interface DreamReport {
+  dreamId: string;
+  timestamp: string;
+  summary: string;
+  observations: string[];
+  memoryProposals: string[];
+  skillProposals: string[];
+  nextExperiments: string[];
+  sourceTraceIds: string[];
+  sourceLogIds: string[];
+}
+
+export interface MemoryFile {
+  path: string;
+  content: string;
+}
+
 export async function runLifeOSAgent(input: string): Promise<LifeOSRunResponse> {
   const response = await fetch(`${API_BASE}/api/lifeos/run`, {
     method: 'POST',
@@ -60,6 +77,26 @@ export async function runLifeOSAgent(input: string): Promise<LifeOSRunResponse> 
 
 export async function getLatestHarnessTrace() {
   const response = await fetch(`${API_BASE}/api/lifeos/traces/latest`);
+  if (!response.ok) {
+    throw new Error(`LifeOS Agent backend returned ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function runDreaming(): Promise<{ dream: DreamReport; memoryFiles: MemoryFile[] }> {
+  const response = await fetch(`${API_BASE}/api/lifeos/dream`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    throw new Error(`LifeOS Agent backend returned ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function getMemoryFiles(): Promise<{ files: MemoryFile[] }> {
+  const response = await fetch(`${API_BASE}/api/lifeos/memory-files`);
   if (!response.ok) {
     throw new Error(`LifeOS Agent backend returned ${response.status}`);
   }

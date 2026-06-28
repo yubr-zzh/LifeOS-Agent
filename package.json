@@ -7,6 +7,7 @@
     "backend:dev": "npm --prefix backend run dev",
     "backend:check": "npm --prefix backend run check",
     "backend:smoke": "npm --prefix backend run smoke",
+    "backend:smoke:dream": "npm --prefix backend run smoke:dream",
     "frontend:dev": "npm --prefix frontend run dev",
     "frontend:build": "npm --prefix frontend run build",
     "frontend:check": "npm --prefix frontend run check",

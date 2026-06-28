@@ -1,5 +1,5 @@
 import http from "node:http";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SEED_DIR = path.join(__dirname, "data");
 const STATE_DIR = path.join(__dirname, ".lifeos-state");
+const MEMORY_VAULT_DIR = path.join(STATE_DIR, "memory-vault");
 const PORT = Number(process.env.LIFEOS_AGENT_PORT || 4399);
 
 const jsonHeaders = {
@@ -35,6 +36,84 @@ async function writeJson(name, data) {
   await mkdir(STATE_DIR, { recursive: true });
   const file = path.join(STATE_DIR, name);
   await writeFile(file, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+}
+
+function frontmatter(fields) {
+  const lines = Object.entries(fields).map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
+  return `---\n${lines.join("\n")}\n---\n\n`;
+}
+
+function safeFileName(value) {
+  return String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "memory";
+}
+
+async function writeMemoryFile(relativePath, content) {
+  const file = path.join(MEMORY_VAULT_DIR, relativePath);
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, content, "utf8");
+}
+
+async function listMarkdownFiles(dir, base = dir) {
+  if (!existsSync(dir)) return [];
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await listMarkdownFiles(fullPath, base));
+    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      const relativePath = path.relative(base, fullPath).replaceAll("\\", "/");
+      files.push({
+        path: relativePath,
+        content: await readFile(fullPath, "utf8")
+      });
+    }
+  }
+  return files.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+async function syncFileSystemMemory({ profile, memories, skills, traces, dreams = [] }) {
+  await writeMemoryFile(
+    "README.md",
+    `${frontmatter({ type: "memory_vault", updated: nowIso() })}# LifeOS File-system Memory\n\n这个目录是 LifeOS Agent 的文件式系统内存。JSON store 负责机器读取，Markdown vault 负责人类审查、Agent 反思和长期沉淀。\n\n## 目录\n\n- \`profile.md\`：当前修士画像和境界\n- \`memories/\`：长期模式与目标记忆\n- \`skills/\`：功法 Skills 当前参数与进化记录\n- \`traces/\`：最近 Agent Harness trace 摘要\n- \`dreams/\`：Dreaming 离线反思报告\n`
+  );
+
+  await writeMemoryFile(
+    "profile.md",
+    `${frontmatter({ type: "profile", id: profile.id, updated: nowIso() })}# ${profile.name || "修士"}\n\n- 总境界：${profile.overallRealm || "未知"}\n- 总进度：${profile.totalProgress || 0}%\n\n## 长期目标\n\n${(profile.longTermGoals || []).map((goal) => `- ${goal}`).join("\n") || "- 暂无"}\n\n## 子境界\n\n${(profile.subRealms || []).map((realm) => `- ${realm.name}：${realm.realm}，${realm.progress}%`).join("\n")}\n\n## 稳定模式\n\n${(profile.patterns || []).map((pattern) => `- ${pattern}`).join("\n") || "- 暂无"}\n`
+  );
+
+  for (const memory of memories) {
+    await writeMemoryFile(
+      `memories/${safeFileName(memory.id)}.md`,
+      `${frontmatter({ type: memory.type, id: memory.id, confidence: memory.confidence, updated: memory.lastUpdated })}# ${memory.id}\n\n${memory.content}\n\n## Evidence\n\n${(memory.evidence || []).map((item) => `- ${item}`).join("\n") || "- 暂无"}\n\n## Keywords\n\n${(memory.keywords || []).map((item) => `- ${item}`).join("\n") || "- 暂无"}\n`
+    );
+  }
+
+  for (const skill of skills) {
+    await writeMemoryFile(
+      `skills/${safeFileName(skill.id)}.md`,
+      `${frontmatter({ type: "skill", id: skill.id, score: skill.score, updated: nowIso() })}# ${skill.name}\n\n- Skill ID：${skill.id}\n- 类型：${skill.type}\n- 触发条件：${skill.trigger}\n- 评分：${skill.score}\n\n## Params\n\n\`\`\`json\n${JSON.stringify(skill.params, null, 2)}\n\`\`\`\n\n## Evolution Notes\n\n${(skill.evolutionNotes || []).map((note) => `- ${note.date}：${note.reason}`).join("\n") || "- 暂无"}\n`
+    );
+  }
+
+  for (const trace of traces.slice(-5)) {
+    await writeMemoryFile(
+      `traces/${safeFileName(trace.traceId)}.md`,
+      `${frontmatter({ type: "harness_trace", id: trace.traceId, updated: trace.timestamp })}# ${trace.traceId}\n\n## Input\n\n${trace.input}\n\n## Retrieved Memory\n\n${(trace.retrievedMemory || []).map((memory) => `- ${memory.content} (${memory.confidence})`).join("\n") || "- 暂无"}\n\n## Selected Skills\n\n${(trace.selectedSkills || []).map((skill) => `- ${skill.name} / ${skill.skillId} (${skill.score})`).join("\n") || "- 暂无"}\n\n## Evaluation\n\n\`\`\`json\n${JSON.stringify(trace.evaluation || {}, null, 2)}\n\`\`\`\n\n## Evolution\n\n${(trace.skillEvolution || []).map((change) => `- ${change.param}: ${change.from} -> ${change.to}`).join("\n") || "- 暂无"}\n`
+    );
+  }
+
+  for (const dream of dreams.slice(-5)) {
+    await writeMemoryFile(
+      `dreams/${safeFileName(dream.dreamId)}.md`,
+      `${frontmatter({ type: "dream_report", id: dream.dreamId, updated: dream.timestamp })}# Dream ${dream.dreamId}\n\n## Summary\n\n${dream.summary}\n\n## Observations\n\n${dream.observations.map((item) => `- ${item}`).join("\n")}\n\n## Memory Proposals\n\n${dream.memoryProposals.map((item) => `- ${item}`).join("\n")}\n\n## Skill Proposals\n\n${dream.skillProposals.map((item) => `- ${item}`).join("\n")}\n\n## Next Experiments\n\n${dream.nextExperiments.map((item) => `- ${item}`).join("\n")}\n`
+    );
+  }
 }
 
 async function readBody(req) {
@@ -290,12 +369,13 @@ function buildTrace({ input, parsed, retrievedMemory, selectedSkills, reflection
 }
 
 async function runLifeOSAgent(input) {
-  const [profile, memories, skills, logs, traces] = await Promise.all([
+  const [profile, memories, skills, logs, traces, dreams] = await Promise.all([
     readJson("profile.json", {}),
     readJson("memories.json", []),
     readJson("skills.json", []),
     readJson("logs.json", []),
-    readJson("traces.json", [])
+    readJson("traces.json", []),
+    readJson("dreams.json", [])
   ]);
 
   const parsed = parseInput(input);
@@ -338,6 +418,7 @@ async function runLifeOSAgent(input) {
     writeJson("logs.json", logs.slice(-100)),
     writeJson("traces.json", traces.slice(-100))
   ]);
+  await syncFileSystemMemory({ profile: nextProfile, memories, skills, traces, dreams });
 
   const parsedJournal = {
     achievements: reflection.achievements,
@@ -357,13 +438,125 @@ async function runLifeOSAgent(input) {
   };
 }
 
-async function getState() {
-  const [profile, memories, skills, logs, traces] = await Promise.all([
+async function runDreaming() {
+  const [profile, memories, skills, logs, traces, dreams] = await Promise.all([
     readJson("profile.json", {}),
     readJson("memories.json", []),
     readJson("skills.json", []),
     readJson("logs.json", []),
-    readJson("traces.json", [])
+    readJson("traces.json", []),
+    readJson("dreams.json", [])
+  ]);
+
+  const recentTraces = traces.slice(-5);
+  const recentLogs = logs.slice(-7);
+  const repeatedHeartDemons = new Map();
+  const selectedSkillCounts = new Map();
+
+  for (const trace of recentTraces) {
+    for (const demon of trace.parsedSignals?.heartDemons || []) {
+      repeatedHeartDemons.set(demon, (repeatedHeartDemons.get(demon) || 0) + 1);
+    }
+    for (const skill of trace.selectedSkills || []) {
+      selectedSkillCounts.set(skill.skillId, (selectedSkillCounts.get(skill.skillId) || 0) + 1);
+    }
+  }
+
+  const topDemons = [...repeatedHeartDemons.entries()].sort((a, b) => b[1] - a[1]);
+  const topSkills = [...selectedSkillCounts.entries()].sort((a, b) => b[1] - a[1]);
+  const hasAfternoonDemon = topDemons.some(([name]) => String(name).includes("下午") || String(name).includes("分心"));
+
+  const observations = [
+    recentTraces.length
+      ? `最近 ${recentTraces.length} 次 Agent run 已形成可回放 Harness trace。`
+      : "当前还没有足够 trace，Dreaming 进入冷启动观察模式。",
+    topDemons.length
+      ? `高频心魔：${topDemons.map(([name, count]) => `${name} x${count}`).join("、")}。`
+      : "近期没有明显重复心魔。",
+    topSkills.length
+      ? `高频功法：${topSkills.map(([name, count]) => `${name} x${count}`).join("、")}。`
+      : "近期功法调用样本不足。"
+  ];
+
+  const memoryProposals = [];
+  if (hasAfternoonDemon) {
+    memoryProposals.push("巩固长期模式：下午适合低认知整理任务，上午适合深度学习和核心项目推进。");
+    upsertMemory(memories, {
+      id: "mem_dream_afternoon_strategy",
+      type: "dream_consolidated_pattern",
+      content: "Dreaming 发现下午分心模式重复出现，建议将下午默认规划为整理、复盘、轻量阅读和低风险工程任务。",
+      keywords: ["dreaming", "下午", "分心", "计划"],
+      confidence: 0.84,
+      evidence: recentTraces.map((trace) => trace.traceId),
+      lastUpdated: today()
+    });
+  } else {
+    memoryProposals.push("继续观察执行节律，暂不新增强约束长期模式。");
+  }
+
+  const skillProposals = [];
+  const planning = skills.find((skill) => skill.id === "planning");
+  if (planning) {
+    const from = planning.params.reviewCadence || "daily";
+    planning.params.reviewCadence = hasAfternoonDemon ? "daily_micro_review" : "daily";
+    planning.evolutionNotes.push({
+      date: today(),
+      reason: "Dreaming 根据近期 trace 调整计划复盘节奏。"
+    });
+    skillProposals.push(`planning.reviewCadence: ${from} -> ${planning.params.reviewCadence}`);
+  }
+
+  const memorySkill = skills.find((skill) => skill.id === "memory_consolidation");
+  if (memorySkill) {
+    const from = memorySkill.params.fileSystemSync || false;
+    memorySkill.params.fileSystemSync = true;
+    memorySkill.evolutionNotes.push({
+      date: today(),
+      reason: "Dreaming 启用文件式系统内存同步，便于审查和长期沉淀。"
+    });
+    skillProposals.push(`memory_consolidation.fileSystemSync: ${from} -> true`);
+  }
+
+  const nextExperiments = [
+    "明日深度任务默认安排在上午，并限制为 1 个主线目标。",
+    "下午只安排整理、复盘、接口打磨或文档任务。",
+    "下一次 Journal run 后对比 planDifficulty 与 emotionalSupport 是否改善。"
+  ];
+
+  const dream = {
+    dreamId: `dream_${Date.now()}`,
+    timestamp: nowIso(),
+    summary: "Dreaming 完成一次离线反思：将近期 Harness traces 压缩为长期记忆、Skill 参数调整和下一轮实验。",
+    observations,
+    memoryProposals,
+    skillProposals,
+    nextExperiments,
+    sourceTraceIds: recentTraces.map((trace) => trace.traceId),
+    sourceLogIds: recentLogs.map((log) => log.id)
+  };
+
+  dreams.push(dream);
+  await Promise.all([
+    writeJson("memories.json", memories),
+    writeJson("skills.json", skills),
+    writeJson("dreams.json", dreams.slice(-50))
+  ]);
+  await syncFileSystemMemory({ profile, memories, skills, traces, dreams });
+
+  return {
+    dream,
+    memoryFiles: await listMarkdownFiles(MEMORY_VAULT_DIR)
+  };
+}
+
+async function getState() {
+  const [profile, memories, skills, logs, traces, dreams] = await Promise.all([
+    readJson("profile.json", {}),
+    readJson("memories.json", []),
+    readJson("skills.json", []),
+    readJson("logs.json", []),
+    readJson("traces.json", []),
+    readJson("dreams.json", [])
   ]);
   return {
     profile,
@@ -371,6 +564,7 @@ async function getState() {
     skills,
     logs,
     traces,
+    dreams,
     latestTrace: traces.at(-1) || null
   };
 }
@@ -402,6 +596,18 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/lifeos/traces/latest") {
       const state = await getState();
       send(res, 200, { trace: state.latestTrace });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/lifeos/memory-files") {
+      const state = await getState();
+      await syncFileSystemMemory(state);
+      send(res, 200, { files: await listMarkdownFiles(MEMORY_VAULT_DIR) });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/lifeos/dream") {
+      send(res, 200, await runDreaming());
       return;
     }
 
