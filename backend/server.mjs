@@ -76,10 +76,10 @@ async function listMarkdownFiles(dir, base = dir) {
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-async function syncFileSystemMemory({ profile, memories, skills, traces, dreams = [] }) {
+async function syncFileSystemMemory({ profile, memories, skills, traces, dreams = [], feedbacks = [] }) {
   await writeMemoryFile(
     "README.md",
-    `${frontmatter({ type: "memory_vault", updated: nowIso() })}# LifeOS File-system Memory\n\n这个目录是 LifeOS Agent 的文件式系统内存。JSON store 负责机器读取，Markdown vault 负责人类审查、Agent 反思和长期沉淀。\n\n## 目录\n\n- \`profile.md\`：当前修士画像和境界\n- \`memories/\`：长期模式与目标记忆\n- \`skills/\`：功法 Skills 当前参数与进化记录\n- \`traces/\`：最近 Agent Harness trace 摘要\n- \`dreams/\`：Dreaming 离线反思报告\n`
+    `${frontmatter({ type: "memory_vault", updated: nowIso() })}# LifeOS File-system Memory\n\n这个目录是 LifeOS Agent 的文件式系统内存。JSON store 负责机器读取，Markdown vault 负责人类审查、Agent 反思和长期沉淀。\n\n## 目录\n\n- \`profile.md\`：当前修士画像和境界\n- \`memories/\`：长期模式与目标记忆\n- \`skills/\`：功法 Skills 当前参数与进化记录\n- \`traces/\`：最近 Agent Harness trace 摘要\n- \`dreams/\`：Dreaming 离线反思报告\n- \`feedbacks/\`：用户反馈与二次进化记录\n`
   );
 
   await writeMemoryFile(
@@ -112,6 +112,13 @@ async function syncFileSystemMemory({ profile, memories, skills, traces, dreams 
     await writeMemoryFile(
       `dreams/${safeFileName(dream.dreamId)}.md`,
       `${frontmatter({ type: "dream_report", id: dream.dreamId, updated: dream.timestamp })}# Dream ${dream.dreamId}\n\n## Summary\n\n${dream.summary}\n\n## Observations\n\n${dream.observations.map((item) => `- ${item}`).join("\n")}\n\n## Memory Proposals\n\n${dream.memoryProposals.map((item) => `- ${item}`).join("\n")}\n\n## Skill Proposals\n\n${dream.skillProposals.map((item) => `- ${item}`).join("\n")}\n\n## Next Experiments\n\n${dream.nextExperiments.map((item) => `- ${item}`).join("\n")}\n`
+    );
+  }
+
+  for (const feedback of feedbacks.slice(-10)) {
+    await writeMemoryFile(
+      `feedbacks/${safeFileName(feedback.feedbackId)}.md`,
+      `${frontmatter({ type: "user_feedback", id: feedback.feedbackId, traceId: feedback.traceId, updated: feedback.timestamp })}# Feedback ${feedback.feedbackId}\n\n- Trace：${feedback.traceId}\n- Rating：${feedback.rating}\n- Plan Fit：${feedback.planFit}\n- Adopted：${feedback.adopted}\n\n## Note\n\n${feedback.note || "无"}\n\n## Evolution\n\n${(feedback.evolution || []).map((item) => `- ${item.param}: ${item.from} -> ${item.to}`).join("\n") || "- 暂无"}\n`
     );
   }
 }
@@ -369,13 +376,14 @@ function buildTrace({ input, parsed, retrievedMemory, selectedSkills, reflection
 }
 
 async function runLifeOSAgent(input) {
-  const [profile, memories, skills, logs, traces, dreams] = await Promise.all([
+  const [profile, memories, skills, logs, traces, dreams, feedbacks] = await Promise.all([
     readJson("profile.json", {}),
     readJson("memories.json", []),
     readJson("skills.json", []),
     readJson("logs.json", []),
     readJson("traces.json", []),
-    readJson("dreams.json", [])
+    readJson("dreams.json", []),
+    readJson("feedbacks.json", [])
   ]);
 
   const parsed = parseInput(input);
@@ -418,7 +426,7 @@ async function runLifeOSAgent(input) {
     writeJson("logs.json", logs.slice(-100)),
     writeJson("traces.json", traces.slice(-100))
   ]);
-  await syncFileSystemMemory({ profile: nextProfile, memories, skills, traces, dreams });
+  await syncFileSystemMemory({ profile: nextProfile, memories, skills, traces, dreams, feedbacks });
 
   const parsedJournal = {
     achievements: reflection.achievements,
@@ -439,13 +447,14 @@ async function runLifeOSAgent(input) {
 }
 
 async function runDreaming() {
-  const [profile, memories, skills, logs, traces, dreams] = await Promise.all([
+  const [profile, memories, skills, logs, traces, dreams, feedbacks] = await Promise.all([
     readJson("profile.json", {}),
     readJson("memories.json", []),
     readJson("skills.json", []),
     readJson("logs.json", []),
     readJson("traces.json", []),
-    readJson("dreams.json", [])
+    readJson("dreams.json", []),
+    readJson("feedbacks.json", [])
   ]);
 
   const recentTraces = traces.slice(-5);
@@ -541,7 +550,7 @@ async function runDreaming() {
     writeJson("skills.json", skills),
     writeJson("dreams.json", dreams.slice(-50))
   ]);
-  await syncFileSystemMemory({ profile, memories, skills, traces, dreams });
+  await syncFileSystemMemory({ profile, memories, skills, traces, dreams, feedbacks });
 
   return {
     dream,
@@ -549,14 +558,114 @@ async function runDreaming() {
   };
 }
 
-async function getState() {
-  const [profile, memories, skills, logs, traces, dreams] = await Promise.all([
+async function submitFeedback({ traceId, rating, planFit = "unknown", adopted = "unknown", note = "" }) {
+  const [profile, memories, skills, logs, traces, dreams, feedbacks] = await Promise.all([
     readJson("profile.json", {}),
     readJson("memories.json", []),
     readJson("skills.json", []),
     readJson("logs.json", []),
     readJson("traces.json", []),
-    readJson("dreams.json", [])
+    readJson("dreams.json", []),
+    readJson("feedbacks.json", [])
+  ]);
+
+  const trace = traces.find((item) => item.traceId === traceId) || traces.at(-1);
+  if (!trace) {
+    throw new Error("No trace available for feedback");
+  }
+
+  const evolution = [];
+  const planning = skills.find((skill) => skill.id === "planning");
+  if (planning && (rating === "too_hard" || planFit === "too_heavy")) {
+    const fromIntensity = planning.params.intensity;
+    const fromGranularity = planning.params.taskGranularity;
+    planning.params.intensity = Number(Math.max(0.45, fromIntensity - 0.1).toFixed(2));
+    planning.params.taskGranularity = "micro";
+    planning.score = Number(Math.min(0.98, planning.score + 0.01).toFixed(2));
+    planning.evolutionNotes.push({
+      date: today(),
+      reason: "用户反馈计划过重，降低计划强度并改为微任务粒度。"
+    });
+    evolution.push({ param: "planning.intensity", from: fromIntensity, to: planning.params.intensity });
+    evolution.push({ param: "planning.taskGranularity", from: fromGranularity, to: planning.params.taskGranularity });
+    upsertMemory(memories, {
+      id: "mem_feedback_prefers_micro_tasks",
+      type: "feedback_consolidated_pattern",
+      content: "用户反馈在压力或焦虑状态下更适合微任务计划，而不是高强度整块安排。",
+      keywords: ["feedback", "计划", "微任务", "压力"],
+      confidence: 0.8,
+      evidence: [trace.traceId],
+      lastUpdated: today()
+    });
+  }
+
+  if (rating === "helpful" || rating === "just_right") {
+    for (const selected of trace.selectedSkills || []) {
+      const skill = skills.find((item) => item.id === selected.skillId);
+      if (!skill) continue;
+      const from = skill.score;
+      skill.score = Number(Math.min(0.98, skill.score + 0.015).toFixed(3));
+      skill.evolutionNotes.push({
+        date: today(),
+        reason: `用户反馈 ${rating}，增强本次被调用功法的置信度。`
+      });
+      evolution.push({ param: `${skill.id}.score`, from, to: skill.score });
+    }
+  }
+
+  if (rating === "not_helpful") {
+    upsertMemory(memories, {
+      id: "mem_feedback_needs_concrete_actions",
+      type: "feedback_consolidated_pattern",
+      content: "用户反馈建议不够有帮助时，后续计划需要更具体、可执行，并减少抽象鼓励性表达。",
+      keywords: ["feedback", "具体", "可执行", "计划"],
+      confidence: 0.76,
+      evidence: [trace.traceId],
+      lastUpdated: today()
+    });
+    evolution.push({ param: "planning.outputStyle", from: "balanced", to: "concrete_actions" });
+  }
+
+  const feedback = {
+    feedbackId: `feedback_${Date.now()}`,
+    timestamp: nowIso(),
+    traceId: trace.traceId,
+    rating,
+    planFit,
+    adopted,
+    note,
+    evolution
+  };
+
+  trace.userFeedback = feedback;
+  trace.feedbackEvolution = evolution;
+  feedbacks.push(feedback);
+
+  await Promise.all([
+    writeJson("memories.json", memories),
+    writeJson("skills.json", skills),
+    writeJson("traces.json", traces.slice(-100)),
+    writeJson("feedbacks.json", feedbacks.slice(-100))
+  ]);
+  await syncFileSystemMemory({ profile, memories, skills, traces, dreams, feedbacks });
+
+  return {
+    feedback,
+    updatedTrace: trace,
+    skillEvolution: evolution,
+    memoryFiles: await listMarkdownFiles(MEMORY_VAULT_DIR)
+  };
+}
+
+async function getState() {
+  const [profile, memories, skills, logs, traces, dreams, feedbacks] = await Promise.all([
+    readJson("profile.json", {}),
+    readJson("memories.json", []),
+    readJson("skills.json", []),
+    readJson("logs.json", []),
+    readJson("traces.json", []),
+    readJson("dreams.json", []),
+    readJson("feedbacks.json", [])
   ]);
   return {
     profile,
@@ -565,6 +674,7 @@ async function getState() {
     logs,
     traces,
     dreams,
+    feedbacks,
     latestTrace: traces.at(-1) || null
   };
 }
@@ -608,6 +718,16 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/lifeos/dream") {
       send(res, 200, await runDreaming());
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/lifeos/feedback") {
+      const body = await readBody(req);
+      if (!body.rating || typeof body.rating !== "string") {
+        send(res, 400, { error: "rating is required" });
+        return;
+      }
+      send(res, 200, await submitFeedback(body));
       return;
     }
 

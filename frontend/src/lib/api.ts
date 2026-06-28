@@ -59,6 +59,31 @@ export interface MemoryFile {
   content: string;
 }
 
+export interface FeedbackResponse {
+  feedback: {
+    feedbackId: string;
+    traceId: string;
+    rating: string;
+    planFit: string;
+    adopted: string;
+    note?: string;
+  };
+  updatedTrace: LifeOSRunResponse['harnessTrace'] & {
+    userFeedback?: unknown;
+    feedbackEvolution?: Array<{
+      param: string;
+      from: string | number;
+      to: string | number;
+    }>;
+  };
+  skillEvolution: Array<{
+    param: string;
+    from: string | number;
+    to: string | number;
+  }>;
+  memoryFiles: MemoryFile[];
+}
+
 export async function runLifeOSAgent(input: string): Promise<LifeOSRunResponse> {
   const response = await fetch(`${API_BASE}/api/lifeos/run`, {
     method: 'POST',
@@ -100,5 +125,27 @@ export async function getMemoryFiles(): Promise<{ files: MemoryFile[] }> {
   if (!response.ok) {
     throw new Error(`LifeOS Agent backend returned ${response.status}`);
   }
+  return response.json();
+}
+
+export async function submitFeedback(payload: {
+  traceId?: string;
+  rating: 'too_hard' | 'just_right' | 'helpful' | 'not_helpful';
+  planFit?: string;
+  adopted?: string;
+  note?: string;
+}): Promise<FeedbackResponse> {
+  const response = await fetch(`${API_BASE}/api/lifeos/feedback`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`LifeOS Agent backend returned ${response.status}`);
+  }
+
   return response.json();
 }

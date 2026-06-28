@@ -4,13 +4,15 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { mockData } from '../../lib/mockData';
 import { Sparkles } from 'lucide-react';
-import { runLifeOSAgent } from '../../lib/api';
+import { runLifeOSAgent, submitFeedback, type LifeOSRunResponse } from '../../lib/api';
 
 const JournalPage = () => {
   const [input, setInput] = useState(mockData.journalInputExample);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [streamText, setStreamText] = useState('');
+  const [latestRun, setLatestRun] = useState<LifeOSRunResponse | null>(null);
+  const [feedbackStatus, setFeedbackStatus] = useState('');
 
   const handleAnalyze = async () => {
     if (!input.trim()) return;
@@ -32,6 +34,8 @@ const JournalPage = () => {
           try {
             const run = await runLifeOSAgent(input);
             localStorage.setItem('lifeos:lastRun', JSON.stringify(run));
+            setLatestRun(run);
+            setFeedbackStatus('');
             setResult(run.parsedJournal);
           } catch (error) {
             console.warn('LifeOS backend unavailable, falling back to mock data', error);
@@ -41,6 +45,38 @@ const JournalPage = () => {
         }, 600);
       }
     }, 35);
+  };
+
+  const handleFeedback = async (
+    rating: 'too_hard' | 'just_right' | 'helpful' | 'not_helpful',
+    planFit: string,
+    note: string
+  ) => {
+    if (!latestRun?.harnessTrace?.traceId) {
+      setFeedbackStatus('当前是本地 mock 结果，未写入反馈闭环。');
+      return;
+    }
+
+    setFeedbackStatus('正在写入反馈并触发二次进化...');
+    try {
+      const feedback = await submitFeedback({
+        traceId: latestRun.harnessTrace.traceId,
+        rating,
+        planFit,
+        adopted: rating === 'too_hard' ? 'partially' : 'yes',
+        note,
+      });
+      const nextRun = {
+        ...latestRun,
+        harnessTrace: feedback.updatedTrace,
+      };
+      localStorage.setItem('lifeos:lastRun', JSON.stringify(nextRun));
+      setLatestRun(nextRun);
+      setFeedbackStatus(`反馈已写入：${feedback.skillEvolution.map((item) => `${item.param} → ${item.to}`).join('，')}`);
+    } catch (error) {
+      console.warn('Feedback failed', error);
+      setFeedbackStatus('反馈写入失败，请确认后端已启动。');
+    }
   };
 
   return (
@@ -176,6 +212,38 @@ const JournalPage = () => {
                       <span>{update}</span>
                     </div>
                   ))}
+                </div>
+
+                <div className="bg-white/5 border border-cyan-400/20 rounded-3xl p-7">
+                  <div className="uppercase text-cyan-300 text-xs mb-4 tracking-wider">USER FEEDBACK → SECOND EVOLUTION</div>
+                  <div className="text-white/50 text-sm mb-5">
+                    评价这次计划是否适合你，反馈会写入 Harness trace，并触发 Memory / Skill 二次进化。
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      onClick={() => handleFeedback('too_hard', 'too_heavy', '计划方向有用，但任务粒度偏大，需要微任务。')}
+                      className="rounded-2xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100 hover:bg-red-400/20"
+                    >
+                      计划太重
+                    </button>
+                    <button
+                      onClick={() => handleFeedback('just_right', 'fit', '计划强度和节奏刚好，可以继续沿用。')}
+                      className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100 hover:bg-emerald-400/20"
+                    >
+                      刚刚好
+                    </button>
+                    <button
+                      onClick={() => handleFeedback('helpful', 'helpful', '建议有帮助，可以强化本次调用的功法组合。')}
+                      className="rounded-2xl border border-violet-400/30 bg-violet-400/10 px-4 py-3 text-sm text-violet-100 hover:bg-violet-400/20"
+                    >
+                      有帮助
+                    </button>
+                  </div>
+                  {feedbackStatus && (
+                    <div className="mt-4 rounded-2xl bg-black/40 border border-white/10 px-4 py-3 text-xs text-white/60">
+                      {feedbackStatus}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}

@@ -170,8 +170,30 @@ Daily Input
 
 ## 后续目标
 
+## Step 9：用户反馈驱动的二次进化
+
+**Goal**：让自进化不只来自系统自评和 Dreaming，也来自用户对计划是否可执行的真实反馈。
+
+交付：
+
+- `POST /api/lifeos/feedback`
+- feedback record
+- trace.userFeedback
+- trace.feedbackEvolution
+- feedbacks/*.md 文件式记忆
+- Journal 页面反馈按钮
+
+验收：
+
+- 先运行 `POST /api/lifeos/run`
+- 再提交 `rating=too_hard`
+- `planning.intensity` 下降
+- `planning.taskGranularity` 变成 `micro`
+- `feedbacks/*.md` 生成反馈记忆文件
+
+## 后续目标
+
 1. 把规则生成器替换为 LLM generation node。
-2. 增加 feedback endpoint，让用户对计划打分并触发二次 skill evolution。
-3. Dashboard / Timeline 读取 live profile、logs 和 traces。
-4. 增加一键 Demo Mode，现场稳定复现完整链路。
-5. 将 Harness 页面强化为“工程证据面板”：显示每个节点耗时、输入输出、状态差异。
+2. Dashboard / Timeline 读取 live profile、logs 和 traces。
+3. 增加一键 Demo Mode，现场稳定复现完整链路。
+4. 将 Harness 页面强化为“工程证据面板”：显示每个节点耗时、输入输出、状态差异。

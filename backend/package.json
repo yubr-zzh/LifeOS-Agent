@@ -8,6 +8,7 @@
     "start": "node server.mjs",
     "check": "node --check server.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "smoke:dream": "node scripts/smoke-dream.mjs"
+    "smoke:dream": "node scripts/smoke-dream.mjs",
+    "smoke:feedback": "node scripts/smoke-feedback.mjs"
   }
 }
