@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  
+  .custom-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scroll::-webkit-scrollbar-thumb {
+    background-color: #64748b;
+    border-radius: 20px;
+  }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-150%); }
+  100% { transform: translateX(400%); }
+}
+
+.shimmer {
+  animation: shimmer 2.5s linear infinite;
+}
