@@ -91,18 +91,60 @@ const DashboardPage = () => {
 
       <div className="grid grid-cols-12 gap-5">
         <section className="glass-panel relative col-span-12 min-h-[520px] overflow-hidden rounded-[2rem] p-8 lg:col-span-7">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(94,234,212,.22),transparent_28%),radial-gradient(circle_at_52%_48%,rgba(246,199,104,.12),transparent_42%)]" />
-          <div className="absolute left-8 top-8 z-10 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs text-white/50 backdrop-blur-xl">洞府灵核模拟</div>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(94,234,212,.28),transparent_28%),radial-gradient(circle_at_52%_48%,rgba(246,199,104,.16),transparent_42%)]" />
+          <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(94,234,212,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(94,234,212,.08)_1px,transparent_1px)] [background-size:34px_34px]" />
+          <div className="absolute left-8 top-8 z-10 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs text-white/50 backdrop-blur-xl">动态洞府灵核</div>
 
           <div className="absolute inset-x-12 bottom-12 top-20">
-            <div className="absolute left-1/2 top-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-teal-200/20" style={{ animation: 'pulse-ring 3.8s ease-out infinite' }} />
-            <div className="absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-amber-200/10" style={{ animation: 'slow-spin 28s linear infinite' }} />
+            {Array.from({ length: 26 }).map((_, index) => {
+              const angle = (index / 26) * Math.PI * 2;
+              const radius = 38 + (index % 4) * 7;
+              return (
+                <motion.span
+                  key={`particle-${index}`}
+                  className="absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-full bg-teal-100 shadow-[0_0_18px_rgba(94,234,212,.95)]"
+                  style={{
+                    x: `${Math.cos(angle) * radius * 4}px`,
+                    y: `${Math.sin(angle) * radius * 2.6}px`,
+                  }}
+                  animate={{
+                    opacity: [0.22, 1, 0.22],
+                    scale: [0.65, 1.45, 0.65],
+                    rotate: 360,
+                  }}
+                  transition={{
+                    duration: 3.4 + (index % 5) * 0.35,
+                    repeat: Infinity,
+                    delay: index * 0.07,
+                  }}
+                />
+              );
+            })}
+
+            <div className="absolute left-1/2 top-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-teal-200/25" style={{ animation: 'pulse-ring 3.8s ease-out infinite' }} />
+            <div className="absolute left-1/2 top-1/2 h-[390px] w-[390px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-teal-100/18" style={{ animation: 'slow-spin 36s linear infinite reverse' }} />
+            <div className="absolute left-1/2 top-1/2 h-[470px] w-[470px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-amber-200/12" style={{ animation: 'slow-spin 28s linear infinite' }} />
+            <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-fuchsia-200/8" style={{ animation: 'slow-spin 52s linear infinite reverse' }} />
+
             <motion.div
-              className="absolute left-1/2 top-1/2 grid h-56 w-56 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-teal-100/35 bg-gradient-to-br from-teal-200 via-cyan-200 to-indigo-300 shadow-[0_0_120px_rgba(94,234,212,.42)]"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+              className="absolute left-1/2 top-1/2 grid h-64 w-64 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-teal-100/40 bg-gradient-to-br from-teal-200 via-cyan-200 to-indigo-300 shadow-[0_0_140px_rgba(94,234,212,.58)]"
+              animate={{
+                rotate: 360,
+                boxShadow: [
+                  '0 0 90px rgba(94,234,212,.42)',
+                  '0 0 150px rgba(246,199,104,.35)',
+                  '0 0 110px rgba(159,140,255,.42)',
+                  '0 0 90px rgba(94,234,212,.42)',
+                ],
+              }}
+              transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
             >
-              <div className="grid h-36 w-36 place-items-center rounded-full bg-[#05070c] text-5xl font-black text-teal-100">OS</div>
+              <div className="grid h-40 w-40 place-items-center rounded-full border border-white/10 bg-[#05070c]/92 text-center shadow-inner">
+                <div>
+                  <div className="text-6xl font-black text-teal-100">OS</div>
+                  <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.24em] text-teal-100/52">Life Core</div>
+                </div>
+              </div>
             </motion.div>
 
             {subRealms.slice(0, 5).map((realm, index) => {
