@@ -204,6 +204,7 @@ export interface RuntimeConfig {
 export interface FeedbackResponse {
   feedback: {
     feedbackId: string;
+    timestamp: string;
     traceId: string;
     rating: string;
     planFit: string;

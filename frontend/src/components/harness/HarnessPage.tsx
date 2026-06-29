@@ -9,6 +9,7 @@ import {
   Gauge,
   GitCompareArrows,
   Loader2,
+  MessageSquareHeart,
   MoonStar,
   Play,
   RefreshCw,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { mockData } from '../../lib/mockData';
 import {
+  getLifeOSState,
   getLatestHarnessTrace,
   getMemoryFiles,
   getRuntimeConfig,
@@ -28,12 +30,15 @@ import {
   type DreamReport,
   type HarnessStateDiff,
   type HarnessTrace,
+  type LifeOSState,
   type MemoryFile,
   type RuntimeConfig,
   type TraceStep,
 } from '../../lib/api';
 
 const fallbackTrace = mockData.harnessTrace as unknown as HarnessTrace;
+type FeedbackEvidence = LifeOSState['feedbacks'][number];
+type EvidenceView = 'run' | 'feedback' | 'dream';
 
 const stepIconMap: Record<string, LucideIcon> = {
   parser: FileText,
@@ -49,6 +54,8 @@ const HarnessPage = () => {
   const [trace, setTrace] = useState<HarnessTrace>(fallbackTrace);
   const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
   const [dream, setDream] = useState<DreamReport | null>(null);
+  const [feedbackEvidence, setFeedbackEvidence] = useState<FeedbackEvidence | null>(null);
+  const [evidenceView, setEvidenceView] = useState<EvidenceView>('run');
   const [memoryFiles, setMemoryFiles] = useState<MemoryFile[]>([]);
   const [activeStep, setActiveStep] = useState(0);
   const [isReplaying, setIsReplaying] = useState(false);
@@ -80,6 +87,14 @@ const HarnessPage = () => {
     getRuntimeConfig()
       .then(setRuntimeConfig)
       .catch((error) => console.warn('LifeOS runtime config unavailable', error));
+
+    getLifeOSState()
+      .then((state) => {
+        if (state.latestTrace) setTrace(state.latestTrace);
+        setDream(state.dreams.at(-1) ?? null);
+        setFeedbackEvidence(state.feedbacks.at(-1) ?? null);
+      })
+      .catch((error) => console.warn('LifeOS state unavailable, using partial harness data', error));
   }, []);
 
   const evidenceSteps = useMemo(() => {
@@ -87,12 +102,51 @@ const HarnessPage = () => {
     return buildFallbackSteps(trace);
   }, [trace]);
 
+  const selectedEvidence = useMemo(() => {
+    if (evidenceView === 'dream') {
+      return {
+        title: 'Dreaming Evidence',
+        subtitle: dream?.dreamId ?? 'waiting for dreaming report',
+        chip: 'offline reflection',
+        icon: MoonStar,
+        steps: dream?.traceSteps ?? [],
+        diff: dream?.stateDiff,
+        latency: dream?.totalLatencyMs,
+      };
+    }
+
+    if (evidenceView === 'feedback') {
+      return {
+        title: 'Feedback Evidence',
+        subtitle: feedbackEvidence?.feedbackId ?? 'waiting for feedback',
+        chip: feedbackEvidence?.rating ?? 'feedback loop',
+        icon: MessageSquareHeart,
+        steps: feedbackEvidence?.traceSteps ?? [],
+        diff: feedbackEvidence?.stateDiff,
+        latency: feedbackEvidence?.totalLatencyMs,
+      };
+    }
+
+    return {
+      title: 'Agent Run Evidence',
+      subtitle: trace.traceId,
+      chip: 'daily input -> persistence',
+      icon: ServerCog,
+      steps: evidenceSteps,
+      diff: trace.stateDiff,
+      latency: trace.totalLatencyMs,
+    };
+  }, [dream, evidenceSteps, evidenceView, feedbackEvidence, trace]);
+
+  const selectedSteps = selectedEvidence.steps.length ? selectedEvidence.steps : buildEmptyEvidenceStep(selectedEvidence.title);
+  const EvidenceIcon = selectedEvidence.icon;
+
   const replayHarness = () => {
     setIsReplaying(true);
     setActiveStep(0);
     let index = 0;
     const interval = setInterval(() => {
-      if (index < evidenceSteps.length) {
+      if (index < selectedSteps.length) {
         setActiveStep(index);
         index += 1;
       } else {
@@ -109,6 +163,8 @@ const HarnessPage = () => {
       const result = await runDemoMode();
       setTrace(result.run.harnessTrace as HarnessTrace);
       setDream(result.dream);
+      setFeedbackEvidence(result.feedback.feedback);
+      setEvidenceView('run');
       setMemoryFiles(result.memoryFiles);
       localStorage.setItem('lifeos:lastRun', JSON.stringify(result.run));
       setStatus(`Demo 闭环完成：${result.run.harnessTrace.traceId}`);
@@ -127,6 +183,7 @@ const HarnessPage = () => {
     try {
       const result = await runDreaming();
       setDream(result.dream);
+      setEvidenceView('dream');
       setMemoryFiles(result.memoryFiles);
       setStatus(`Dreaming 已完成：${result.dream.dreamId}`);
     } catch (error) {
@@ -138,7 +195,6 @@ const HarnessPage = () => {
   };
 
   const modelCall = trace.modelCalls?.[0] ?? dream?.modelCalls?.[0];
-  const stateDiff = trace.stateDiff;
 
   return (
     <div className="h-screen overflow-auto p-8 pr-10 custom-scroll">
@@ -176,27 +232,41 @@ const HarnessPage = () => {
 
       {status && <div className="mb-5 rounded-2xl border border-teal-200/18 bg-teal-200/8 px-5 py-4 text-sm text-teal-50/78">{status}</div>}
 
-      <div className="mb-5 grid grid-cols-4 gap-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
         <RuntimeCard title="LLM Node" value={runtimeConfig?.llm.enabled ? 'DeepSeek 在线' : '规则 fallback'} detail={runtimeConfig?.llm.model ?? 'waiting backend'} icon={BrainCircuit} />
         <RuntimeCard title="Vision Node" value={runtimeConfig?.vision.hasApiKey ? '豆包视觉已配置' : '待接入'} detail={runtimeConfig?.vision.endpointId || 'multimodal memory next'} icon={Sparkles} />
-        <RuntimeCard title="Trace Steps" value={`${evidenceSteps.length} steps`} detail={`${trace.totalLatencyMs ?? 0}ms total`} icon={Clock3} />
+        <RuntimeCard title="Trace Steps" value={`${selectedSteps.length} steps`} detail={`${selectedEvidence.latency ?? 0}ms total`} icon={Clock3} />
         <RuntimeCard title="Model Call" value={modelCall ? modelCall.status : 'none'} detail={modelCall ? `${modelCall.purpose} / ${modelCall.latencyMs}ms` : '等待下一次运行'} icon={ServerCog} />
       </div>
+
+      <EvidenceSwitcher
+        active={evidenceView}
+        onChange={(view) => {
+          setEvidenceView(view);
+          setActiveStep(0);
+        }}
+        runCount={evidenceSteps.length}
+        feedbackCount={feedbackEvidence?.traceSteps?.length ?? 0}
+        dreamCount={dream?.traceSteps?.length ?? 0}
+      />
 
       <div className="grid grid-cols-12 gap-5">
         <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-8">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <div className="text-sm font-semibold text-white/78">Agent Run Pipeline</div>
-              <div className="mt-1 font-mono text-[10px] text-white/35">{trace.traceId}</div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-white/78">
+                <EvidenceIcon size={17} className="text-teal-100" />
+                {selectedEvidence.title}
+              </div>
+              <div className="mt-1 font-mono text-[10px] text-white/35">{selectedEvidence.subtitle}</div>
             </div>
             <span className="rounded-full border border-white/10 bg-black/24 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">
-              daily input → persistence
+              {selectedEvidence.chip}
             </span>
           </div>
 
           <div className="space-y-3">
-            {evidenceSteps.map((step, index) => (
+            {selectedSteps.map((step, index) => (
               <TraceStepRow
                 key={`${step.id}-${index}`}
                 step={step}
@@ -209,7 +279,7 @@ const HarnessPage = () => {
 
         <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-4">
           <div className="mb-5 text-sm font-semibold text-white/78">State Diff</div>
-          <StateDiffPanel diff={stateDiff} />
+          <StateDiffPanel diff={selectedEvidence.diff} />
 
           <div className="mt-6 rounded-[1.4rem] border border-amber-200/15 bg-amber-200/[0.055] p-5">
             <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-amber-100/70">
@@ -288,6 +358,76 @@ const HarnessPage = () => {
           </div>
         </section>
       </div>
+    </div>
+  );
+};
+
+const evidenceOptions: Array<{
+  id: EvidenceView;
+  title: string;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { id: 'run', title: '主运行链路', label: 'Agent Run', icon: ServerCog },
+  { id: 'feedback', title: '反馈进化链路', label: 'Feedback', icon: MessageSquareHeart },
+  { id: 'dream', title: '梦境沉淀链路', label: 'Dreaming', icon: MoonStar },
+];
+
+const EvidenceSwitcher = ({
+  active,
+  onChange,
+  runCount,
+  feedbackCount,
+  dreamCount,
+}: {
+  active: EvidenceView;
+  onChange: (view: EvidenceView) => void;
+  runCount: number;
+  feedbackCount: number;
+  dreamCount: number;
+}) => {
+  const counts: Record<EvidenceView, number> = {
+    run: runCount,
+    feedback: feedbackCount,
+    dream: dreamCount,
+  };
+
+  return (
+    <div className="mb-5 grid grid-cols-1 gap-3 xl:grid-cols-3">
+      {evidenceOptions.map((option) => {
+        const Icon = option.icon;
+        const isActive = option.id === active;
+        const count = counts[option.id];
+
+        return (
+          <button
+            key={option.id}
+            onClick={() => onChange(option.id)}
+            className={`group flex min-h-[72px] items-center justify-between rounded-[1.25rem] border px-5 py-4 text-left transition ${
+              isActive
+                ? 'border-teal-200/30 bg-teal-200/[0.09] shadow-[0_0_36px_rgba(94,234,212,.1)]'
+                : 'border-white/10 bg-white/[0.035] hover:border-white/18 hover:bg-white/[0.055]'
+            }`}
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <div
+                className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border ${
+                  isActive ? 'border-teal-200/35 bg-teal-200/12 text-teal-100' : 'border-white/10 bg-black/18 text-white/45'
+                }`}
+              >
+                <Icon size={18} />
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-bold text-white/82">{option.title}</div>
+                <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/32">{option.label}</div>
+              </div>
+            </div>
+            <div className={`rounded-full px-3 py-1 font-mono text-[11px] ${count ? 'bg-teal-200/12 text-teal-50/78' : 'bg-white/[0.055] text-white/32'}`}>
+              {count} steps
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 };
@@ -409,6 +549,21 @@ function buildFallbackSteps(trace: HarnessTrace): TraceStep[] {
       latencyMs: 0,
       inputSummary: trace.input,
       outputSummary: 'Using mock trace because no backend traceSteps are available.',
+    },
+  ];
+}
+
+function buildEmptyEvidenceStep(title: string): TraceStep[] {
+  return [
+    {
+      id: 'waiting_for_evidence',
+      title: `Waiting for ${title}`,
+      type: 'persistence',
+      status: 'ok',
+      startedAt: new Date().toISOString(),
+      latencyMs: 0,
+      inputSummary: 'Run demo mode, submit feedback, or trigger Dreaming to generate this evidence chain.',
+      outputSummary: 'No traceSteps have been recorded for this view yet.',
     },
   ];
 }
