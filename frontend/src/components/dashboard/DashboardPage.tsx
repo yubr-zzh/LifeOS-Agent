@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { Activity, Flame, Sparkles, Target, Waves } from 'lucide-react';
+import { Activity, ChevronDown, Flame, Sparkles, Target, Waves, type LucideIcon } from 'lucide-react';
 import { mockData } from '../../lib/mockData';
 import { getLifeOSState, type LifeOSState } from '../../lib/api';
 import { Progress } from './ProgressBar';
 
 const DashboardPage = () => {
   const [state, setState] = useState<LifeOSState | null>(null);
+  const [expandedPanel, setExpandedPanel] = useState<string | null>(null);
 
   useEffect(() => {
     getLifeOSState()
@@ -63,6 +64,11 @@ const DashboardPage = () => {
   }, [latestLog, liveHeartDemons, liveTasks, state]);
 
   const { cultivatorName, currentRealm, totalProgress, subRealms, todayTasks, heartDemons, recentBreakthroughs } = dashboard;
+  const completedTasks = todayTasks.filter((task) => task.completed).length;
+
+  const togglePanel = (panel: string) => {
+    setExpandedPanel((current) => (current === panel ? null : panel));
+  };
 
   return (
     <div className="h-screen overflow-auto p-8 pr-10 custom-scroll">
@@ -183,38 +189,41 @@ const DashboardPage = () => {
           </div>
         </section>
 
-        <section className="col-span-12 space-y-5 lg:col-span-5">
-          <div className="glass-panel rounded-[2rem] p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-semibold text-white/80">
-                <Target size={18} className="text-teal-200" />
-                今日修炼任务
-              </div>
-              <span className="rounded-full bg-white/8 px-3 py-1 text-xs text-white/45">{todayTasks.filter((task) => task.completed).length}/{todayTasks.length}</span>
-            </div>
+        <section className="col-span-12 space-y-3 lg:col-span-5">
+          <CompactPanel
+            title="今日修炼任务"
+            icon={Target}
+            badge={`${completedTasks}/${todayTasks.length}`}
+            summary={todayTasks.find((task) => !task.completed)?.title ?? todayTasks[0]?.title ?? '今日暂无任务'}
+            expanded={expandedPanel === 'tasks'}
+            onToggle={() => togglePanel('tasks')}
+          >
             <div className="space-y-3">
               {todayTasks.map((task, index) => (
                 <motion.div
                   key={task.id}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.06 }}
-                  className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${
+                  transition={{ delay: index * 0.045 }}
+                  className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${
                     task.completed ? 'border-teal-200/18 bg-teal-200/8 text-white/62' : 'border-white/10 bg-white/[0.035] text-white/86'
                   }`}
                 >
-                  <span className={`h-2.5 w-2.5 rounded-full ${task.completed ? 'bg-teal-200' : 'bg-amber-200'}`} />
+                  <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${task.completed ? 'bg-teal-200' : 'bg-amber-200'}`} />
                   <span className={task.completed ? 'line-through' : ''}>{task.title}</span>
                 </motion.div>
               ))}
             </div>
-          </div>
+          </CompactPanel>
 
-          <div className="glass-panel rounded-[2rem] p-6">
-            <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-white/80">
-              <Flame size={18} className="text-rose-300" />
-              当前心魔
-            </div>
+          <CompactPanel
+            title="当前心魔"
+            icon={Flame}
+            badge={`${heartDemons[0]?.intensity ?? 0}`}
+            summary={heartDemons.slice(0, 3).map((demon) => `${demon.name} ${demon.intensity}`).join(' / ')}
+            expanded={expandedPanel === 'demons'}
+            onToggle={() => togglePanel('demons')}
+          >
             <div className="space-y-4">
               {heartDemons.map((demon) => (
                 <div key={demon.name}>
@@ -228,43 +237,93 @@ const DashboardPage = () => {
                 </div>
               ))}
             </div>
-          </div>
-        </section>
+          </CompactPanel>
 
-        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-7">
-          <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-white/80">
-            <Waves size={18} className="text-amber-200" />
-            近期突破
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            {recentBreakthroughs.map((item, index) => (
-              <div key={index} className="rounded-2xl border border-amber-200/15 bg-amber-200/[0.055] p-5 text-sm leading-relaxed text-amber-50/82">
-                {item}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-5">
-          <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-white/80">
-            <Activity size={18} className="text-indigo-200" />
-            子境界进度
-          </div>
-          <div className="space-y-5">
-            {subRealms.map((realm) => (
-              <div key={realm.name}>
-                <div className="mb-2 flex justify-between text-sm">
-                  <span className="text-white/78">{realm.name}</span>
-                  <span className="text-white/42">{realm.level}</span>
+          <CompactPanel
+            title="近期突破"
+            icon={Waves}
+            badge={`${recentBreakthroughs.length}`}
+            summary={recentBreakthroughs[0] ?? '等待下一次突破记录'}
+            expanded={expandedPanel === 'breakthroughs'}
+            onToggle={() => togglePanel('breakthroughs')}
+          >
+            <div className="grid gap-3">
+              {recentBreakthroughs.map((item, index) => (
+                <div key={index} className="rounded-2xl border border-amber-200/15 bg-amber-200/[0.055] p-4 text-sm leading-relaxed text-amber-50/82">
+                  {item}
                 </div>
-                <Progress value={realm.progress} color={realm.color} />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </CompactPanel>
+
+          <CompactPanel
+            title="子境界进度"
+            icon={Activity}
+            badge={`${subRealms.length}`}
+            summary={subRealms.slice(0, 3).map((realm) => `${realm.name} ${realm.level}`).join(' / ')}
+            expanded={expandedPanel === 'realms'}
+            onToggle={() => togglePanel('realms')}
+          >
+            <div className="space-y-5">
+              {subRealms.map((realm) => (
+                <div key={realm.name}>
+                  <div className="mb-2 flex justify-between text-sm">
+                    <span className="text-white/78">{realm.name}</span>
+                    <span className="text-white/42">{realm.level}</span>
+                  </div>
+                  <Progress value={realm.progress} color={realm.color} />
+                </div>
+              ))}
+            </div>
+          </CompactPanel>
         </section>
       </div>
     </div>
   );
 };
+
+const CompactPanel = ({
+  title,
+  icon: Icon,
+  badge,
+  summary,
+  expanded,
+  onToggle,
+  children,
+}: {
+  title: string;
+  icon: LucideIcon;
+  badge: string;
+  summary: string;
+  expanded: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) => (
+  <div className="glass-panel overflow-hidden rounded-[1.55rem]">
+    <button onClick={onToggle} className="flex w-full items-center gap-4 px-5 py-4 text-left">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-black/20">
+        <Icon size={18} className="text-teal-100" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-3">
+          <div className="shrink-0 text-sm font-semibold text-white/82">{title}</div>
+          <div className="truncate text-xs text-white/42">{summary}</div>
+        </div>
+      </div>
+      <span className="shrink-0 rounded-full bg-white/8 px-3 py-1 text-xs text-white/45">{badge}</span>
+      <ChevronDown size={16} className={`shrink-0 text-white/42 transition ${expanded ? 'rotate-180' : ''}`} />
+    </button>
+
+    {expanded && (
+      <motion.div
+        initial={{ height: 0, opacity: 0 }}
+        animate={{ height: 'auto', opacity: 1 }}
+        className="border-t border-white/10 px-5 pb-5 pt-4"
+      >
+        {children}
+      </motion.div>
+    )}
+  </div>
+);
 
 export default DashboardPage;
