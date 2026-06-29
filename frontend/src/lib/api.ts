@@ -38,6 +38,9 @@ export interface LifeOSRunResponse {
       to: string | number;
     }>;
     modelCalls?: ModelCall[];
+    traceSteps?: TraceStep[];
+    totalLatencyMs?: number;
+    stateDiff?: unknown;
   };
   profile: unknown;
   dailyLog: unknown;
@@ -70,8 +73,23 @@ export interface ModelCall {
   error?: string;
 }
 
+export interface TraceStep {
+  id: string;
+  title: string;
+  type: string;
+  status: 'ok' | 'error';
+  startedAt: string;
+  latencyMs: number;
+  inputSummary: string;
+  outputSummary: string;
+  error?: string;
+}
+
 export type HarnessTrace = LifeOSRunResponse['harnessTrace'] & {
   modelCalls?: ModelCall[];
+  traceSteps?: TraceStep[];
+  totalLatencyMs?: number;
+  stateDiff?: unknown;
   parsedSignals?: {
     topics?: string[];
     heartDemons?: string[];

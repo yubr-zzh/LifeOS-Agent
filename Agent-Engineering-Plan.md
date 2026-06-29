@@ -235,6 +235,28 @@ Daily Input
 
 ## 后续目标
 
-1. 将 Harness 页面强化为“工程证据面板”：显示每个节点耗时、输入输出、状态差异。
+## Step 12：Harness 工程证据链
+
+**Goal**：让每次 Agent run 都可观测、可回放、可解释，不只展示最终回答。
+
+交付：
+
+- `harnessTrace.traceSteps`
+- 每个节点记录 `inputSummary / outputSummary / latencyMs / status`
+- `harnessTrace.stateDiff`
+- Memory diff：新增、更新、数量变化
+- Profile diff：总境界与子境界变化
+- Skill diff：参数进化记录
+- smoke test 校验 traceSteps 与 stateDiff
+
+验收：
+
+- `POST /api/lifeos/run` 返回完整 pipeline steps
+- `traceSteps` 至少包含 parse、retrieval、skill、reflection、evaluation、memory、skill evolution、profile、persistence
+- 最新 trace 持久化后仍包含 persistence step
+
+## 后续目标
+
+1. 前端 Harness 面板展示每个节点耗时、输入输出、状态差异。
 2. 接入豆包视觉模型：图片日记、白板截图、学习材料截图进入 multimodal memory。
 3. 准备路演 README、PPT 文案和固定演示脚本。

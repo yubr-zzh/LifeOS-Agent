@@ -20,5 +20,20 @@ console.log(JSON.stringify({
   heartDemons: result.parsedJournal.heartDemons,
   selectedSkills: result.harnessTrace.selectedSkills.map((skill) => skill.skillId),
   memoryUpdates: result.harnessTrace.memoryUpdates,
-  skillEvolution: result.harnessTrace.skillEvolution
+  skillEvolution: result.harnessTrace.skillEvolution,
+  traceSteps: result.harnessTrace.traceSteps?.map((step) => ({
+    id: step.id,
+    status: step.status,
+    latencyMs: step.latencyMs
+  })),
+  totalLatencyMs: result.harnessTrace.totalLatencyMs,
+  stateDiff: result.harnessTrace.stateDiff
 }, null, 2));
+
+if (!Array.isArray(result.harnessTrace.traceSteps) || result.harnessTrace.traceSteps.length < 8) {
+  throw new Error("Expected harnessTrace.traceSteps to include the full Agent run pipeline");
+}
+
+if (!result.harnessTrace.stateDiff?.memory || !result.harnessTrace.stateDiff?.profile) {
+  throw new Error("Expected harnessTrace.stateDiff to include memory and profile diffs");
+}

@@ -134,6 +134,103 @@ function normalizeStringArray(value, fallback = []) {
     : fallback;
 }
 
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function summarizeForTrace(value, maxLength = 420) {
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+async function runTraceStep(steps, { id, title, type, input }, fn) {
+  const startedAt = nowIso();
+  const started = Date.now();
+  try {
+    const output = await fn();
+    steps.push({
+      id,
+      title,
+      type,
+      status: "ok",
+      startedAt,
+      latencyMs: Date.now() - started,
+      inputSummary: summarizeForTrace(input),
+      outputSummary: summarizeForTrace(output)
+    });
+    return output;
+  } catch (error) {
+    steps.push({
+      id,
+      title,
+      type,
+      status: "error",
+      startedAt,
+      latencyMs: Date.now() - started,
+      inputSummary: summarizeForTrace(input),
+      outputSummary: "",
+      error: error instanceof Error ? error.message : String(error)
+    });
+    throw error;
+  }
+}
+
+function getMemoryDiff(before, after) {
+  const beforeById = new Map(before.map((memory) => [memory.id, memory]));
+  const added = [];
+  const updated = [];
+
+  for (const memory of after) {
+    const previous = beforeById.get(memory.id);
+    if (!previous) {
+      added.push(memory.id);
+      continue;
+    }
+    if (
+      previous.content !== memory.content ||
+      previous.confidence !== memory.confidence ||
+      JSON.stringify(previous.evidence || []) !== JSON.stringify(memory.evidence || [])
+    ) {
+      updated.push(memory.id);
+    }
+  }
+
+  return {
+    beforeCount: before.length,
+    afterCount: after.length,
+    countDelta: after.length - before.length,
+    added,
+    updated
+  };
+}
+
+function getProfileDiff(before, after) {
+  const beforeRealms = new Map((before.subRealms || []).map((realm) => [realm.name, realm.progress]));
+  return {
+    totalProgress: {
+      from: before.totalProgress || 0,
+      to: after.totalProgress || 0,
+      delta: (after.totalProgress || 0) - (before.totalProgress || 0)
+    },
+    subRealms: (after.subRealms || [])
+      .map((realm) => ({
+        name: realm.name,
+        from: beforeRealms.get(realm.name) ?? 0,
+        to: realm.progress,
+        delta: realm.progress - (beforeRealms.get(realm.name) ?? 0)
+      }))
+      .filter((realm) => realm.delta !== 0)
+  };
+}
+
+function getSkillSnapshot(skills) {
+  return skills.map((skill) => ({
+    id: skill.id,
+    score: skill.score,
+    params: cloneJson(skill.params || {})
+  }));
+}
+
 function getRuntimeConfig() {
   const llm = getLlmConfig();
   return {
@@ -479,15 +576,19 @@ function evolveSkills(parsed, skills, evaluation) {
   if (planning && (evaluation.planDifficulty >= 0.68 || parsed.heartDemons.includes("目标过大"))) {
     const fromIntensity = planning.params.intensity;
     const fromGranularity = planning.params.taskGranularity;
-    planning.params.intensity = Number(Math.max(0.55, fromIntensity - 0.2).toFixed(2));
-    planning.params.taskGranularity = "small";
+    planning.params.intensity = Number(Math.max(0.45, fromIntensity - 0.2).toFixed(2));
+    planning.params.taskGranularity = fromGranularity === "micro" ? "micro" : "small";
     planning.score = Number(Math.min(0.95, planning.score + 0.01).toFixed(2));
     planning.evolutionNotes.push({
       date: today(),
       reason: "检测到计划难度偏高或目标过大，降低强度并拆小任务。"
     });
-    changes.push({ param: "planning.intensity", from: fromIntensity, to: planning.params.intensity });
-    changes.push({ param: "planning.taskGranularity", from: fromGranularity, to: planning.params.taskGranularity });
+    if (fromIntensity !== planning.params.intensity) {
+      changes.push({ param: "planning.intensity", from: fromIntensity, to: planning.params.intensity });
+    }
+    if (fromGranularity !== planning.params.taskGranularity) {
+      changes.push({ param: "planning.taskGranularity", from: fromGranularity, to: planning.params.taskGranularity });
+    }
   }
 
   const obstacle = skills.find((skill) => skill.id === "obstacle_detection");
@@ -499,7 +600,9 @@ function evolveSkills(parsed, skills, evaluation) {
       date: today(),
       reason: "本次记录出现多个心魔，提高识别敏感度。"
     });
-    changes.push({ param: "obstacle_detection.sensitivity", from, to: obstacle.params.sensitivity });
+    if (from !== obstacle.params.sensitivity) {
+      changes.push({ param: "obstacle_detection.sensitivity", from, to: obstacle.params.sensitivity });
+    }
   }
 
   return changes.length ? changes : [{ param: "skill.evolution", from: "no_change", to: "stable" }];
@@ -524,7 +627,19 @@ function updateProfile(profile, parsed) {
   return profile;
 }
 
-function buildTrace({ input, parsed, retrievedMemory, selectedSkills, reflection, evaluation, memoryUpdates, skillEvolution }) {
+function buildTrace({
+  input,
+  parsed,
+  retrievedMemory,
+  selectedSkills,
+  reflection,
+  evaluation,
+  memoryUpdates,
+  skillEvolution,
+  traceSteps = [],
+  stateDiff = {},
+  totalLatencyMs = 0
+}) {
   return {
     traceId: `trace_${Date.now()}`,
     timestamp: nowIso(),
@@ -548,6 +663,9 @@ function buildTrace({ input, parsed, retrievedMemory, selectedSkills, reflection
     evaluation,
     memoryUpdates,
     skillEvolution,
+    traceSteps,
+    stateDiff,
+    totalLatencyMs,
     modelCalls: reflection.modelCalls || [],
     parsedSignals: {
       topics: parsed.topics,
@@ -558,6 +676,8 @@ function buildTrace({ input, parsed, retrievedMemory, selectedSkills, reflection
 }
 
 async function runLifeOSAgent(input) {
+  const runStarted = Date.now();
+  const traceSteps = [];
   const [profile, memories, skills, logs, traces, dreams, feedbacks] = await Promise.all([
     readJson("profile.json", {}),
     readJson("memories.json", []),
@@ -568,14 +688,110 @@ async function runLifeOSAgent(input) {
     readJson("feedbacks.json", [])
   ]);
 
-  const parsed = parseInput(input);
-  const retrievedMemory = retrieveMemory(parsed, memories);
-  const selectedSkills = selectSkills(parsed, skills);
-  const reflection = await generateReflection(parsed, retrievedMemory, selectedSkills);
-  const evaluation = evaluateRun(parsed, selectedSkills, retrievedMemory);
-  const memoryUpdates = evolveMemory(parsed, memories);
-  const skillEvolution = evolveSkills(parsed, skills, evaluation);
-  const nextProfile = updateProfile(profile, parsed);
+  const profileBefore = cloneJson(profile);
+  const memoriesBefore = cloneJson(memories);
+  const skillsBefore = getSkillSnapshot(skills);
+
+  const parsed = await runTraceStep(
+    traceSteps,
+    {
+      id: "parse_input",
+      title: "Parse daily input",
+      type: "parser",
+      input: { inputLength: input.length, preview: input.slice(0, 120) }
+    },
+    () => parseInput(input)
+  );
+
+  const retrievedMemory = await runTraceStep(
+    traceSteps,
+    {
+      id: "memory_retrieval",
+      title: "Retrieve relevant memory",
+      type: "memory",
+      input: { tokens: parsed.tokens, memoryCount: memories.length }
+    },
+    () => retrieveMemory(parsed, memories)
+  );
+
+  const selectedSkills = await runTraceStep(
+    traceSteps,
+    {
+      id: "skill_selection",
+      title: "Select executable skills",
+      type: "skill",
+      input: { topics: parsed.topics, heartDemons: parsed.heartDemons, skillCount: skills.length }
+    },
+    () => selectSkills(parsed, skills)
+  );
+
+  const reflection = await runTraceStep(
+    traceSteps,
+    {
+      id: "reflection_generation",
+      title: "Generate reflection and plan",
+      type: "llm_or_rule",
+      input: {
+        selectedSkills: selectedSkills.map((skill) => skill.id),
+        retrievedMemory: retrievedMemory.map((memory) => memory.id)
+      }
+    },
+    () => generateReflection(parsed, retrievedMemory, selectedSkills)
+  );
+
+  const evaluation = await runTraceStep(
+    traceSteps,
+    {
+      id: "harness_evaluation",
+      title: "Evaluate run quality",
+      type: "evaluator",
+      input: { heartDemons: parsed.heartDemons, selectedSkills: selectedSkills.map((skill) => skill.id) }
+    },
+    () => evaluateRun(parsed, selectedSkills, retrievedMemory)
+  );
+
+  const memoryUpdates = await runTraceStep(
+    traceSteps,
+    {
+      id: "memory_update",
+      title: "Update long-term memory",
+      type: "memory",
+      input: { beforeCount: memories.length, parsedSignals: parsed.tokens }
+    },
+    () => evolveMemory(parsed, memories)
+  );
+
+  const skillEvolution = await runTraceStep(
+    traceSteps,
+    {
+      id: "skill_evolution",
+      title: "Evolve skill parameters",
+      type: "skill",
+      input: { evaluation, selectedSkills: selectedSkills.map((skill) => skill.id) }
+    },
+    () => evolveSkills(parsed, skills, evaluation)
+  );
+
+  const nextProfile = await runTraceStep(
+    traceSteps,
+    {
+      id: "profile_update",
+      title: "Update cultivation profile",
+      type: "profile",
+      input: { totalProgress: profile.totalProgress, topics: parsed.topics }
+    },
+    () => updateProfile(profile, parsed)
+  );
+
+  const stateDiff = {
+    memory: getMemoryDiff(memoriesBefore, memories),
+    profile: getProfileDiff(profileBefore, nextProfile),
+    skills: {
+      before: skillsBefore,
+      evolution: skillEvolution
+    }
+  };
+
   const trace = buildTrace({
     input,
     parsed,
@@ -584,7 +800,10 @@ async function runLifeOSAgent(input) {
     reflection,
     evaluation,
     memoryUpdates,
-    skillEvolution
+    skillEvolution,
+    traceSteps,
+    stateDiff,
+    totalLatencyMs: Date.now() - runStarted
   });
 
   const dailyLog = {
@@ -601,14 +820,31 @@ async function runLifeOSAgent(input) {
 
   logs.push(dailyLog);
   traces.push(trace);
-  await Promise.all([
-    writeJson("profile.json", nextProfile),
-    writeJson("memories.json", memories),
-    writeJson("skills.json", skills),
-    writeJson("logs.json", logs.slice(-100)),
-    writeJson("traces.json", traces.slice(-100))
-  ]);
-  await syncFileSystemMemory({ profile: nextProfile, memories, skills, traces, dreams, feedbacks });
+  await runTraceStep(
+    traceSteps,
+    {
+      id: "persistence",
+      title: "Persist JSON store and memory vault",
+      type: "persistence",
+      input: { traceId: trace.traceId, logs: logs.length, traces: traces.length }
+    },
+    async () => {
+      await Promise.all([
+        writeJson("profile.json", nextProfile),
+        writeJson("memories.json", memories),
+        writeJson("skills.json", skills),
+        writeJson("logs.json", logs.slice(-100)),
+        writeJson("traces.json", traces.slice(-100))
+      ]);
+      await syncFileSystemMemory({ profile: nextProfile, memories, skills, traces, dreams, feedbacks });
+      return {
+        jsonStores: ["profile", "memories", "skills", "logs", "traces"],
+        memoryVault: true
+      };
+    }
+  );
+  trace.totalLatencyMs = Date.now() - runStarted;
+  await writeJson("traces.json", traces.slice(-100));
 
   const parsedJournal = {
     achievements: reflection.achievements,
