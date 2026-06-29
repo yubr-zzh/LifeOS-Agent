@@ -279,3 +279,19 @@ Daily Input
 1. 将 Feedback 与 Dreaming 也扩展为同一套 trace step schema。
 2. 接入豆包视觉模型：图片日记、白板截图、学习材料截图进入 multimodal memory。
 3. 准备路演 README、PPT 文案和固定演示脚本。
+
+## Step 14: Feedback / Dreaming Trace Schema
+
+**Goal**: Make the self-evolution loop auditable beyond the main Agent run. Dreaming and user feedback should expose the same engineering evidence shape as `harnessTrace`, so judges can inspect how memory, skills, and file-system state changed.
+
+Deliverables:
+- `dream.traceSteps`, `dream.stateDiff`, `dream.totalLatencyMs`
+- `feedback.traceSteps`, `feedback.stateDiff`, `feedback.totalLatencyMs`
+- Top-level feedback response mirrors `traceSteps/stateDiff/totalLatencyMs`
+- Smoke tests assert evidence exists for Dreaming and Feedback
+- Frontend API types support the new fields
+
+Acceptance:
+- `npm run backend:smoke:dream` returns Dreaming pipeline step IDs and state diff
+- `npm run backend:smoke:feedback` returns Feedback pipeline step IDs and state diff
+- The schema can be reused by future UI panels without backend changes

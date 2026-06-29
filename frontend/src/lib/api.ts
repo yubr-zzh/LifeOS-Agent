@@ -57,6 +57,9 @@ export interface DreamReport {
   sourceTraceIds: string[];
   sourceLogIds: string[];
   modelCalls?: ModelCall[];
+  traceSteps?: TraceStep[];
+  totalLatencyMs?: number;
+  stateDiff?: HarnessStateDiff;
 }
 
 export interface MemoryFile {
@@ -176,6 +179,9 @@ export interface LifeOSState {
     planFit: string;
     adopted: string;
     note?: string;
+    traceSteps?: TraceStep[];
+    totalLatencyMs?: number;
+    stateDiff?: HarnessStateDiff;
   }>;
   latestTrace: HarnessTrace | null;
 }
@@ -203,6 +209,9 @@ export interface FeedbackResponse {
     planFit: string;
     adopted: string;
     note?: string;
+    traceSteps?: TraceStep[];
+    totalLatencyMs?: number;
+    stateDiff?: HarnessStateDiff;
   };
   updatedTrace: LifeOSRunResponse['harnessTrace'] & {
     userFeedback?: unknown;
@@ -217,6 +226,9 @@ export interface FeedbackResponse {
     from: string | number;
     to: string | number;
   }>;
+  traceSteps?: TraceStep[];
+  totalLatencyMs?: number;
+  stateDiff?: HarnessStateDiff;
   memoryFiles: MemoryFile[];
 }
 

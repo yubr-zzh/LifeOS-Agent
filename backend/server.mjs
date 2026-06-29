@@ -926,6 +926,8 @@ async function enhanceDreamingWithLlm({ profile, recentTraces, recentLogs, obser
 }
 
 async function runDreaming() {
+  const runStarted = Date.now();
+  const traceSteps = [];
   const [profile, memories, skills, logs, traces, dreams, feedbacks] = await Promise.all([
     readJson("profile.json", {}),
     readJson("memories.json", []),
@@ -936,8 +938,24 @@ async function runDreaming() {
     readJson("feedbacks.json", [])
   ]);
 
+  const memoriesBefore = cloneJson(memories);
+  const skillsBefore = getSkillSnapshot(skills);
   const recentTraces = traces.slice(-5);
   const recentLogs = logs.slice(-7);
+  await runTraceStep(
+    traceSteps,
+    {
+      id: "dreaming_source_context",
+      title: "Dreaming source context",
+      type: "dreaming",
+      input: { traceCount: traces.length, logCount: logs.length, feedbackCount: feedbacks.length }
+    },
+    async () => ({
+      recentTraceIds: recentTraces.map((trace) => trace.traceId),
+      recentLogIds: recentLogs.map((log) => log.id),
+      recentFeedbackIds: feedbacks.slice(-5).map((feedback) => feedback.feedbackId)
+    })
+  );
   const repeatedHeartDemons = new Map();
   const selectedSkillCounts = new Map();
 
@@ -953,6 +971,21 @@ async function runDreaming() {
   const topDemons = [...repeatedHeartDemons.entries()].sort((a, b) => b[1] - a[1]);
   const topSkills = [...selectedSkillCounts.entries()].sort((a, b) => b[1] - a[1]);
   const hasAfternoonDemon = topDemons.some(([name]) => String(name).includes("下午") || String(name).includes("分心"));
+
+  await runTraceStep(
+    traceSteps,
+    {
+      id: "dreaming_pattern_mining",
+      title: "Dreaming pattern mining",
+      type: "memory",
+      input: { recentTraceIds: recentTraces.map((trace) => trace.traceId) }
+    },
+    async () => ({
+      repeatedHeartDemons: topDemons,
+      selectedSkillCounts: topSkills,
+      hasAfternoonDemon
+    })
+  );
 
   const observations = [
     recentTraces.length
@@ -981,29 +1014,54 @@ async function runDreaming() {
   } else {
     memoryProposals.push("继续观察执行节律，暂不新增强约束长期模式。");
   }
+  await runTraceStep(
+    traceSteps,
+    {
+      id: "dreaming_memory_consolidation",
+      title: "Dreaming memory consolidation",
+      type: "memory",
+      input: { hasAfternoonDemon, sourceTraceIds: recentTraces.map((trace) => trace.traceId) }
+    },
+    async () => ({ memoryProposals, memoryDiff: getMemoryDiff(memoriesBefore, memories) })
+  );
 
   const skillProposals = [];
   const planning = skills.find((skill) => skill.id === "planning");
   if (planning) {
     const from = planning.params.reviewCadence || "daily";
-    planning.params.reviewCadence = hasAfternoonDemon ? "daily_micro_review" : "daily";
-    planning.evolutionNotes.push({
-      date: today(),
-      reason: "Dreaming 根据近期 trace 调整计划复盘节奏。"
-    });
-    skillProposals.push(`planning.reviewCadence: ${from} -> ${planning.params.reviewCadence}`);
+    const next = hasAfternoonDemon ? "daily_micro_review" : "daily";
+    if (from !== next) {
+      planning.params.reviewCadence = next;
+      planning.evolutionNotes.push({
+        date: today(),
+        reason: "Dreaming 根据近期 trace 调整计划复盘节奏。"
+      });
+      skillProposals.push(`planning.reviewCadence: ${from} -> ${planning.params.reviewCadence}`);
+    }
   }
 
   const memorySkill = skills.find((skill) => skill.id === "memory_consolidation");
   if (memorySkill) {
     const from = memorySkill.params.fileSystemSync || false;
-    memorySkill.params.fileSystemSync = true;
-    memorySkill.evolutionNotes.push({
-      date: today(),
-      reason: "Dreaming 启用文件式系统内存同步，便于审查和长期沉淀。"
-    });
-    skillProposals.push(`memory_consolidation.fileSystemSync: ${from} -> true`);
+    if (from !== true) {
+      memorySkill.params.fileSystemSync = true;
+      memorySkill.evolutionNotes.push({
+        date: today(),
+        reason: "Dreaming 启用文件式系统内存同步，便于审查和长期沉淀。"
+      });
+      skillProposals.push(`memory_consolidation.fileSystemSync: ${from} -> true`);
+    }
   }
+  await runTraceStep(
+    traceSteps,
+    {
+      id: "dreaming_skill_evolution",
+      title: "Dreaming skill evolution",
+      type: "skill",
+      input: { topSkills, hasAfternoonDemon }
+    },
+    async () => ({ skillProposals, before: skillsBefore, after: getSkillSnapshot(skills) })
+  );
 
   const nextExperiments = [
     "明日深度任务默认安排在上午，并限制为 1 个主线目标。",
@@ -1023,15 +1081,25 @@ async function runDreaming() {
     sourceLogIds: recentLogs.map((log) => log.id)
   };
 
-  const llmDream = await enhanceDreamingWithLlm({
-    profile,
-    recentTraces,
-    recentLogs,
-    observations,
-    memoryProposals,
-    skillProposals,
-    nextExperiments
-  });
+  const llmDream = await runTraceStep(
+    traceSteps,
+    {
+      id: "dreaming_synthesis",
+      title: "Dreaming synthesis",
+      type: "model",
+      input: { observations, memoryProposals, skillProposals, nextExperiments }
+    },
+    async () =>
+      enhanceDreamingWithLlm({
+        profile,
+        recentTraces,
+        recentLogs,
+        observations,
+        memoryProposals,
+        skillProposals,
+        nextExperiments
+      })
+  );
 
   if (llmDream?.json) {
     dream = {
@@ -1050,13 +1118,41 @@ async function runDreaming() {
     };
   }
 
+  dream = {
+    ...dream,
+    traceSteps,
+    totalLatencyMs: Date.now() - runStarted,
+    stateDiff: {
+      memory: getMemoryDiff(memoriesBefore, memories),
+      skills: {
+        before: skillsBefore,
+        evolution: skillProposals.map((proposal) => ({ param: proposal, from: "before_dreaming", to: "after_dreaming" }))
+      }
+    }
+  };
+
   dreams.push(dream);
-  await Promise.all([
-    writeJson("memories.json", memories),
-    writeJson("skills.json", skills),
-    writeJson("dreams.json", dreams.slice(-50))
-  ]);
-  await syncFileSystemMemory({ profile, memories, skills, traces, dreams, feedbacks });
+  await runTraceStep(
+    traceSteps,
+    {
+      id: "dreaming_persistence",
+      title: "Dreaming persistence",
+      type: "filesystem",
+      input: { dreamId: dream.dreamId, memoryCount: memories.length, skillCount: skills.length }
+    },
+    async () => {
+      await Promise.all([
+        writeJson("memories.json", memories),
+        writeJson("skills.json", skills),
+        writeJson("dreams.json", dreams.slice(-50))
+      ]);
+      await syncFileSystemMemory({ profile, memories, skills, traces, dreams, feedbacks });
+      return { dreamId: dream.dreamId, filesSynced: true };
+    }
+  );
+  dream.traceSteps = traceSteps;
+  dream.totalLatencyMs = Date.now() - runStarted;
+  await writeJson("dreams.json", dreams.slice(-50));
 
   return {
     dream,
@@ -1065,6 +1161,8 @@ async function runDreaming() {
 }
 
 async function submitFeedback({ traceId, rating, planFit = "unknown", adopted = "unknown", note = "" }) {
+  const runStarted = Date.now();
+  const traceSteps = [];
   const [profile, memories, skills, logs, traces, dreams, feedbacks] = await Promise.all([
     readJson("profile.json", {}),
     readJson("memories.json", []),
@@ -1075,7 +1173,29 @@ async function submitFeedback({ traceId, rating, planFit = "unknown", adopted = 
     readJson("feedbacks.json", [])
   ]);
 
-  const trace = traces.find((item) => item.traceId === traceId) || traces.at(-1);
+  const memoriesBefore = cloneJson(memories);
+  const skillsBefore = getSkillSnapshot(skills);
+  await runTraceStep(
+    traceSteps,
+    {
+      id: "feedback_interpretation",
+      title: "Feedback interpretation",
+      type: "evaluation",
+      input: { traceId, rating, planFit, adopted, note }
+    },
+    async () => ({ rating, planFit, adopted, hasNote: Boolean(note?.trim()) })
+  );
+
+  const trace = await runTraceStep(
+    traceSteps,
+    {
+      id: "feedback_trace_selection",
+      title: "Feedback trace selection",
+      type: "trace",
+      input: { requestedTraceId: traceId, traceCount: traces.length }
+    },
+    async () => traces.find((item) => item.traceId === traceId) || traces.at(-1)
+  );
   if (!trace) {
     throw new Error("No trace available for feedback");
   }
@@ -1085,6 +1205,7 @@ async function submitFeedback({ traceId, rating, planFit = "unknown", adopted = 
   if (planning && (rating === "too_hard" || planFit === "too_heavy")) {
     const fromIntensity = planning.params.intensity;
     const fromGranularity = planning.params.taskGranularity;
+    const fromScore = planning.score;
     planning.params.intensity = Number(Math.max(0.45, fromIntensity - 0.1).toFixed(2));
     planning.params.taskGranularity = "micro";
     planning.score = Number(Math.min(0.98, planning.score + 0.01).toFixed(2));
@@ -1092,8 +1213,15 @@ async function submitFeedback({ traceId, rating, planFit = "unknown", adopted = 
       date: today(),
       reason: "用户反馈计划过重，降低计划强度并改为微任务粒度。"
     });
-    evolution.push({ param: "planning.intensity", from: fromIntensity, to: planning.params.intensity });
-    evolution.push({ param: "planning.taskGranularity", from: fromGranularity, to: planning.params.taskGranularity });
+    if (fromIntensity !== planning.params.intensity) {
+      evolution.push({ param: "planning.intensity", from: fromIntensity, to: planning.params.intensity });
+    }
+    if (fromGranularity !== planning.params.taskGranularity) {
+      evolution.push({ param: "planning.taskGranularity", from: fromGranularity, to: planning.params.taskGranularity });
+    }
+    if (fromScore !== planning.score) {
+      evolution.push({ param: "planning.score", from: fromScore, to: planning.score });
+    }
     upsertMemory(memories, {
       id: "mem_feedback_prefers_micro_tasks",
       type: "feedback_consolidated_pattern",
@@ -1131,6 +1259,21 @@ async function submitFeedback({ traceId, rating, planFit = "unknown", adopted = 
     });
     evolution.push({ param: "planning.outputStyle", from: "balanced", to: "concrete_actions" });
   }
+  await runTraceStep(
+    traceSteps,
+    {
+      id: "feedback_evolution",
+      title: "Feedback evolution",
+      type: "skill",
+      input: { rating, planFit, selectedSkills: trace.selectedSkills || [] }
+    },
+    async () => ({
+      evolution,
+      memoryDiff: getMemoryDiff(memoriesBefore, memories),
+      skillSnapshotBefore: skillsBefore,
+      skillSnapshotAfter: getSkillSnapshot(skills)
+    })
+  );
 
   const feedback = {
     feedbackId: `feedback_${Date.now()}`,
@@ -1140,25 +1283,56 @@ async function submitFeedback({ traceId, rating, planFit = "unknown", adopted = 
     planFit,
     adopted,
     note,
-    evolution
+    evolution,
+    traceSteps,
+    totalLatencyMs: Date.now() - runStarted,
+    stateDiff: {
+      memory: getMemoryDiff(memoriesBefore, memories),
+      skills: {
+        before: skillsBefore,
+        evolution
+      }
+    }
   };
 
   trace.userFeedback = feedback;
   trace.feedbackEvolution = evolution;
   feedbacks.push(feedback);
 
+  await runTraceStep(
+    traceSteps,
+    {
+      id: "feedback_persistence",
+      title: "Feedback persistence",
+      type: "filesystem",
+      input: { feedbackId: feedback.feedbackId, traceId: trace.traceId }
+    },
+    async () => {
+      await Promise.all([
+        writeJson("memories.json", memories),
+        writeJson("skills.json", skills),
+        writeJson("traces.json", traces.slice(-100)),
+        writeJson("feedbacks.json", feedbacks.slice(-100))
+      ]);
+      await syncFileSystemMemory({ profile, memories, skills, traces, dreams, feedbacks });
+      return { feedbackId: feedback.feedbackId, filesSynced: true };
+    }
+  );
+  feedback.traceSteps = traceSteps;
+  feedback.totalLatencyMs = Date.now() - runStarted;
+  trace.userFeedback = feedback;
   await Promise.all([
-    writeJson("memories.json", memories),
-    writeJson("skills.json", skills),
     writeJson("traces.json", traces.slice(-100)),
     writeJson("feedbacks.json", feedbacks.slice(-100))
   ]);
-  await syncFileSystemMemory({ profile, memories, skills, traces, dreams, feedbacks });
 
   return {
     feedback,
     updatedTrace: trace,
     skillEvolution: evolution,
+    traceSteps,
+    stateDiff: feedback.stateDiff,
+    totalLatencyMs: feedback.totalLatencyMs,
     memoryFiles: await listMarkdownFiles(MEMORY_VAULT_DIR)
   };
 }

@@ -28,11 +28,23 @@ if (!feedbackResponse.ok) {
 
 const result = await feedbackResponse.json();
 
+if (!Array.isArray(result.traceSteps) || result.traceSteps.length < 3) {
+  throw new Error("Feedback smoke failed: missing traceSteps evidence");
+}
+
+if (!result.stateDiff?.memory || !result.stateDiff?.skills) {
+  throw new Error("Feedback smoke failed: missing stateDiff evidence");
+}
+
 console.log(JSON.stringify({
   feedbackId: result.feedback.feedbackId,
   traceId: result.feedback.traceId,
   rating: result.feedback.rating,
   skillEvolution: result.skillEvolution,
+  traceStepCount: result.traceSteps.length,
+  traceStepIds: result.traceSteps.map((step) => step.id),
+  stateDiff: result.stateDiff,
+  totalLatencyMs: result.totalLatencyMs,
   fileCount: result.memoryFiles.length,
   sampleFeedbackFile: result.memoryFiles.find((file) => file.path.startsWith("feedbacks/"))?.path
 }, null, 2));
