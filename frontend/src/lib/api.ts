@@ -85,11 +85,46 @@ export interface TraceStep {
   error?: string;
 }
 
+export interface HarnessStateDiff {
+  memory?: {
+    beforeCount: number;
+    afterCount: number;
+    countDelta: number;
+    added: string[];
+    updated: string[];
+  };
+  profile?: {
+    totalProgress?: {
+      from: number;
+      to: number;
+      delta: number;
+    };
+    subRealms?: Array<{
+      name: string;
+      from: number;
+      to: number;
+      delta: number;
+    }>;
+  };
+  skills?: {
+    before?: Array<{
+      id: string;
+      score: number;
+      params: Record<string, unknown>;
+    }>;
+    evolution?: Array<{
+      param: string;
+      from: string | number;
+      to: string | number;
+    }>;
+  };
+}
+
 export type HarnessTrace = LifeOSRunResponse['harnessTrace'] & {
   modelCalls?: ModelCall[];
   traceSteps?: TraceStep[];
   totalLatencyMs?: number;
-  stateDiff?: unknown;
+  stateDiff?: HarnessStateDiff;
   parsedSignals?: {
     topics?: string[];
     heartDemons?: string[];

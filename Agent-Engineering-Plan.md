@@ -257,6 +257,25 @@ Daily Input
 
 ## 后续目标
 
-1. 前端 Harness 面板展示每个节点耗时、输入输出、状态差异。
+## Step 13：前端 Harness 工程证据面板
+
+**Goal**：把后端 `traceSteps/stateDiff` 转成路演现场可直接理解的工程证据。
+
+交付：
+
+- Harness 页面展示真实 pipeline steps
+- 每步展示 `status / latencyMs / inputSummary / outputSummary`
+- 右侧展示 Memory/Profile/Skill state diff
+- 仍保留 LLM、Vision、Dreaming、Memory vault 状态
+
+验收：
+
+- 点击“一键演示闭环”后，Harness 面板展示最新 trace 的完整节点链路
+- 每个节点可看到耗时与输入输出摘要
+- state diff 可展示境界进度、记忆、技能变化
+
+## 后续目标
+
+1. 将 Feedback 与 Dreaming 也扩展为同一套 trace step schema。
 2. 接入豆包视觉模型：图片日记、白板截图、学习材料截图进入 multimodal memory。
 3. 准备路演 README、PPT 文案和固定演示脚本。
