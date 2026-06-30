@@ -45,10 +45,10 @@ export default function App() {
       <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
 
       <main className="relative ml-[280px] flex-1">
-        <div className="fixed right-6 top-6 z-40 flex items-center gap-3">
+        <div className="absolute right-6 top-6 z-40 flex items-center gap-3">
           <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/38 px-3 py-2 text-xs text-white/60 shadow-[0_16px_44px_rgba(0,0,0,.28)] backdrop-blur-2xl">
             <Palette size={14} className="text-teal-100/80" />
-            <span className="hidden xl:inline">视觉体系</span>
+            <span className="hidden xl:inline">主题</span>
             <div className="ml-1 flex items-center gap-1">
               {visualThemes.map((theme) => {
                 const active = visualTheme === theme.id;

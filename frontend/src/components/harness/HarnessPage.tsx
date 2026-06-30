@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   BrainCircuit,
   CheckCircle2,
-  Clock3,
   Database,
   FileText,
-  Gauge,
   GitCompareArrows,
   Loader2,
   MessageSquareHeart,
   MoonStar,
   Play,
-  RefreshCw,
   ServerCog,
   Sparkles,
   WandSparkles,
@@ -22,7 +19,6 @@ import {
 import { mockData } from '../../lib/mockData';
 import {
   getLifeOSState,
-  getLatestHarnessTrace,
   getMemoryFiles,
   getRuntimeConfig,
   runDemoMode,
@@ -45,9 +41,14 @@ const stepIconMap: Record<string, LucideIcon> = {
   memory: Database,
   skill: WandSparkles,
   llm_or_rule: BrainCircuit,
-  evaluator: Gauge,
+  evaluator: ServerCog,
   profile: Sparkles,
   persistence: GitCompareArrows,
+  dreaming: MoonStar,
+  trace: GitCompareArrows,
+  evaluation: MessageSquareHeart,
+  filesystem: Database,
+  model: BrainCircuit,
 };
 
 const HarnessPage = () => {
@@ -55,30 +56,21 @@ const HarnessPage = () => {
   const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null);
   const [dream, setDream] = useState<DreamReport | null>(null);
   const [feedbackEvidence, setFeedbackEvidence] = useState<FeedbackEvidence | null>(null);
-  const [evidenceView, setEvidenceView] = useState<EvidenceView>('run');
   const [memoryFiles, setMemoryFiles] = useState<MemoryFile[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
-  const [isReplaying, setIsReplaying] = useState(false);
+  const [evidenceView, setEvidenceView] = useState<EvidenceView>('run');
+  const [showEvidence, setShowEvidence] = useState(false);
   const [isDemoRunning, setIsDemoRunning] = useState(false);
   const [isDreaming, setIsDreaming] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    const cachedRun = localStorage.getItem('lifeos:lastRun');
-    if (cachedRun) {
-      try {
-        const parsed = JSON.parse(cachedRun);
-        if (parsed.harnessTrace) setTrace(parsed.harnessTrace);
-      } catch (error) {
-        console.warn('Failed to read cached LifeOS trace', error);
-      }
-    }
-
-    getLatestHarnessTrace()
-      .then((result) => {
-        if (result.trace) setTrace(result.trace);
+    getLifeOSState()
+      .then((state) => {
+        if (state.latestTrace) setTrace(state.latestTrace);
+        setDream(state.dreams.at(-1) ?? null);
+        setFeedbackEvidence(state.feedbacks.at(-1) ?? null);
       })
-      .catch((error) => console.warn('LifeOS trace unavailable, using fallback', error));
+      .catch((error) => console.warn('LifeOS state unavailable, using fallback harness data', error));
 
     getMemoryFiles()
       .then((result) => setMemoryFiles(result.files ?? []))
@@ -87,28 +79,15 @@ const HarnessPage = () => {
     getRuntimeConfig()
       .then(setRuntimeConfig)
       .catch((error) => console.warn('LifeOS runtime config unavailable', error));
-
-    getLifeOSState()
-      .then((state) => {
-        if (state.latestTrace) setTrace(state.latestTrace);
-        setDream(state.dreams.at(-1) ?? null);
-        setFeedbackEvidence(state.feedbacks.at(-1) ?? null);
-      })
-      .catch((error) => console.warn('LifeOS state unavailable, using partial harness data', error));
   }, []);
 
-  const evidenceSteps = useMemo(() => {
-    if (trace.traceSteps?.length) return trace.traceSteps;
-    return buildFallbackSteps(trace);
-  }, [trace]);
+  const runSteps = trace.traceSteps?.length ? trace.traceSteps : buildFallbackSteps(trace);
 
   const selectedEvidence = useMemo(() => {
     if (evidenceView === 'dream') {
       return {
-        title: 'Dreaming Evidence',
-        subtitle: dream?.dreamId ?? 'waiting for dreaming report',
-        chip: 'offline reflection',
-        icon: MoonStar,
+        title: 'Dreaming 证据链',
+        subtitle: dream?.dreamId ?? '等待 Dreaming',
         steps: dream?.traceSteps ?? [],
         diff: dream?.stateDiff,
         latency: dream?.totalLatencyMs,
@@ -117,10 +96,8 @@ const HarnessPage = () => {
 
     if (evidenceView === 'feedback') {
       return {
-        title: 'Feedback Evidence',
-        subtitle: feedbackEvidence?.feedbackId ?? 'waiting for feedback',
-        chip: feedbackEvidence?.rating ?? 'feedback loop',
-        icon: MessageSquareHeart,
+        title: '反馈进化证据链',
+        subtitle: feedbackEvidence?.feedbackId ?? '等待用户反馈',
         steps: feedbackEvidence?.traceSteps ?? [],
         diff: feedbackEvidence?.stateDiff,
         latency: feedbackEvidence?.totalLatencyMs,
@@ -128,33 +105,16 @@ const HarnessPage = () => {
     }
 
     return {
-      title: 'Agent Run Evidence',
+      title: '主运行证据链',
       subtitle: trace.traceId,
-      chip: 'daily input -> persistence',
-      icon: ServerCog,
-      steps: evidenceSteps,
+      steps: runSteps,
       diff: trace.stateDiff,
       latency: trace.totalLatencyMs,
     };
-  }, [dream, evidenceSteps, evidenceView, feedbackEvidence, trace]);
+  }, [dream, evidenceView, feedbackEvidence, runSteps, trace]);
 
   const selectedSteps = selectedEvidence.steps.length ? selectedEvidence.steps : buildEmptyEvidenceStep(selectedEvidence.title);
-  const EvidenceIcon = selectedEvidence.icon;
-
-  const replayHarness = () => {
-    setIsReplaying(true);
-    setActiveStep(0);
-    let index = 0;
-    const interval = setInterval(() => {
-      if (index < selectedSteps.length) {
-        setActiveStep(index);
-        index += 1;
-      } else {
-        clearInterval(interval);
-        setIsReplaying(false);
-      }
-    }, 520);
-  };
+  const modelCall = trace.modelCalls?.[0] ?? dream?.modelCalls?.[0];
 
   const handleDemoMode = async () => {
     setIsDemoRunning(true);
@@ -164,14 +124,12 @@ const HarnessPage = () => {
       setTrace(result.run.harnessTrace as HarnessTrace);
       setDream(result.dream);
       setFeedbackEvidence(result.feedback.feedback);
-      setEvidenceView('run');
       setMemoryFiles(result.memoryFiles);
       localStorage.setItem('lifeos:lastRun', JSON.stringify(result.run));
-      setStatus(`Demo 闭环完成：${result.run.harnessTrace.traceId}`);
-      replayHarness();
+      setStatus(`LifeOS 闭环完成：${result.run.harnessTrace.traceId}`);
     } catch (error) {
       console.warn('Demo mode failed', error);
-      setStatus('Demo 后端暂不可用，当前展示 fallback trace。');
+      setStatus('Demo 调用失败，请确认后端已启动。');
     } finally {
       setIsDemoRunning(false);
     }
@@ -183,8 +141,9 @@ const HarnessPage = () => {
     try {
       const result = await runDreaming();
       setDream(result.dream);
-      setEvidenceView('dream');
       setMemoryFiles(result.memoryFiles);
+      setEvidenceView('dream');
+      setShowEvidence(true);
       setStatus(`Dreaming 已完成：${result.dream.dreamId}`);
     } catch (error) {
       console.warn('Dreaming failed', error);
@@ -194,186 +153,213 @@ const HarnessPage = () => {
     }
   };
 
-  const modelCall = trace.modelCalls?.[0] ?? dream?.modelCalls?.[0];
-
   return (
     <div className="h-screen overflow-auto p-8 pr-10 custom-scroll">
-      <div className="mb-8 flex items-end justify-between gap-6">
-        <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-200/20 bg-teal-200/8 px-4 py-2 text-xs uppercase tracking-[0.22em] text-teal-100/75">
-            <ServerCog size={14} />
-            Agent Harness
-          </div>
-          <h1 className="text-5xl font-black tracking-[-0.045em] text-white">工程证据面板</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/45">
-            每一次 LifeOS run 都被拆成可观测节点：输入摘要、输出摘要、耗时、状态和 state diff 都能回放。
-          </p>
+      <div className="mb-8">
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-200/20 bg-teal-200/8 px-4 py-2 text-xs uppercase tracking-[0.22em] text-teal-100/75">
+          <ServerCog size={14} />
+          Agent Runtime
         </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={handleDemoMode}
-            disabled={isDemoRunning}
-            className="flex items-center gap-2 rounded-2xl bg-teal-200 px-5 py-4 font-bold text-black transition hover:bg-teal-100 disabled:opacity-60"
-          >
-            {isDemoRunning ? <Loader2 className="animate-spin" size={18} /> : <Play size={18} />}
-            一键演示闭环
-          </button>
-          <button
-            onClick={replayHarness}
-            disabled={isReplaying}
-            className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-5 py-4 text-white/74 transition hover:border-teal-200/25 hover:text-white disabled:opacity-60"
-          >
-            <RefreshCw className={isReplaying ? 'animate-spin' : ''} size={18} />
-            回放 Trace
-          </button>
+        <div className="flex items-end justify-between gap-8">
+          <div>
+            <h1 className="text-5xl font-black tracking-[-0.045em] text-white">LifeOS 内核舱</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/45">
+              这里不是调试台，而是你的伴随式 Agent 中枢。它把日常输入转化为记忆、技能选择、反馈进化与 Dreaming 沉淀。
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={handleDemoMode}
+              disabled={isDemoRunning}
+              className="flex items-center gap-2 rounded-2xl bg-teal-200 px-5 py-4 font-bold text-black transition hover:bg-teal-100 disabled:opacity-60"
+            >
+              {isDemoRunning ? <Loader2 className="animate-spin" size={18} /> : <Play size={18} />}
+              一键演示闭环
+            </button>
+            <button
+              onClick={() => setShowEvidence((value) => !value)}
+              className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-5 py-4 text-white/74 transition hover:border-teal-200/25 hover:text-white"
+            >
+              <GitCompareArrows size={18} />
+              工程证据
+            </button>
+          </div>
         </div>
       </div>
 
       {status && <div className="mb-5 rounded-2xl border border-teal-200/18 bg-teal-200/8 px-5 py-4 text-sm text-teal-50/78">{status}</div>}
 
-      <div className="mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <RuntimeCard title="LLM Node" value={runtimeConfig?.llm.enabled ? 'DeepSeek 在线' : '规则 fallback'} detail={runtimeConfig?.llm.model ?? 'waiting backend'} icon={BrainCircuit} />
-        <RuntimeCard title="Vision Node" value={runtimeConfig?.vision.hasApiKey ? '豆包视觉已配置' : '待接入'} detail={runtimeConfig?.vision.endpointId || 'multimodal memory next'} icon={Sparkles} />
-        <RuntimeCard title="Trace Steps" value={`${selectedSteps.length} steps`} detail={`${selectedEvidence.latency ?? 0}ms total`} icon={Clock3} />
-        <RuntimeCard title="Model Call" value={modelCall ? modelCall.status : 'none'} detail={modelCall ? `${modelCall.purpose} / ${modelCall.latencyMs}ms` : '等待下一次运行'} icon={ServerCog} />
-      </div>
-
-      <EvidenceSwitcher
-        active={evidenceView}
-        onChange={(view) => {
-          setEvidenceView(view);
-          setActiveStep(0);
-        }}
-        runCount={evidenceSteps.length}
-        feedbackCount={feedbackEvidence?.traceSteps?.length ?? 0}
-        dreamCount={dream?.traceSteps?.length ?? 0}
-      />
-
       <div className="grid grid-cols-12 gap-5">
-        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-8">
+        <section className="glass-panel relative col-span-12 min-h-[430px] overflow-hidden rounded-[2rem] p-7 lg:col-span-7">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(94,234,212,.22),transparent_26%),radial-gradient(circle_at_70%_75%,rgba(159,140,255,.14),transparent_32%)]" />
+          <div className="relative z-10 flex h-full flex-col justify-between">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/35">LifeOS Core</div>
+                <div className="mt-2 text-3xl font-black tracking-[-0.04em] text-white">伴随式自进化智能体</div>
+              </div>
+              <RuntimePill online={Boolean(runtimeConfig?.llm.enabled)} />
+            </div>
+
+            <div className="grid place-items-center py-8">
+              <motion.div
+                className="relative grid h-56 w-56 place-items-center rounded-full border border-teal-200/30 bg-teal-200/10"
+                animate={{ boxShadow: ['0 0 60px rgba(94,234,212,.28)', '0 0 110px rgba(159,140,255,.3)', '0 0 60px rgba(94,234,212,.28)'] }}
+                transition={{ duration: 4, repeat: Infinity }}
+              >
+                <div className="absolute inset-8 rounded-full border border-dashed border-white/16" style={{ animation: 'slow-spin 32s linear infinite' }} />
+                <div className="grid h-32 w-32 place-items-center rounded-full bg-black/70 text-center">
+                  <div>
+                    <div className="text-4xl font-black text-teal-100">OS</div>
+                    <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/35">Agent Core</div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <Metric label="Trace" value={trace.traceId?.replace('trace_', '').slice(0, 10) || 'ready'} />
+              <Metric label="Memory" value={`${memoryFiles.length || 0} files`} />
+              <Metric label="Dreaming" value={dream ? 'active' : 'ready'} />
+            </div>
+          </div>
+        </section>
+
+        <section className="col-span-12 grid gap-4 lg:col-span-5">
+          <CapabilityCard
+            icon={Database}
+            title="文件式系统内存"
+            subtitle="把经验沉淀成可审查目录"
+            value={`${memoryFiles.length || 0} files`}
+          />
+          <CapabilityCard
+            icon={WandSparkles}
+            title="技能选择与熟练度"
+            subtitle="根据输入选择可执行 Skill"
+            value={`${trace.selectedSkills?.length ?? 0} skills`}
+          />
+          <CapabilityCard
+            icon={MessageSquareHeart}
+            title="反馈驱动自进化"
+            subtitle="用户反馈会改变策略参数"
+            value={feedbackEvidence?.rating ?? 'waiting'}
+          />
+          <CapabilityCard
+            icon={MoonStar}
+            title="Dreaming 离线凝练"
+            subtitle="压缩近期 traces 为长期模式"
+            value={dream ? 'ready' : 'idle'}
+            action={
+              <button onClick={handleDreaming} disabled={isDreaming} className="rounded-xl border border-amber-200/20 bg-amber-200/[0.06] px-3 py-2 text-xs text-amber-50/78">
+                {isDreaming ? '运行中' : '运行'}
+              </button>
+            }
+          />
+        </section>
+
+        <section className="glass-panel col-span-12 rounded-[2rem] p-6">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-white/78">
-                <EvidenceIcon size={17} className="text-teal-100" />
-                {selectedEvidence.title}
-              </div>
-              <div className="mt-1 font-mono text-[10px] text-white/35">{selectedEvidence.subtitle}</div>
+              <div className="text-sm font-semibold text-white/80">今日闭环摘要</div>
+              <div className="mt-1 text-xs text-white/38">产品视图展示结果；工程细节可以在证据区展开。</div>
             </div>
-            <span className="rounded-full border border-white/10 bg-black/24 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">
-              {selectedEvidence.chip}
-            </span>
+            <div className="flex gap-2 text-xs text-white/40">
+              <span>LLM: {runtimeConfig?.llm.enabled ? runtimeConfig.llm.model : 'fallback'}</span>
+              <span>/</span>
+              <span>Model call: {modelCall?.status ?? 'none'}</span>
+            </div>
           </div>
-
-          <div className="space-y-3">
-            {selectedSteps.map((step, index) => (
-              <TraceStepRow
-                key={`${step.id}-${index}`}
-                step={step}
-                index={index}
-                active={activeStep === index || (!isReplaying && index <= activeStep)}
-              />
+          <div className="grid grid-cols-4 gap-4">
+            {(trace.selectedSkills ?? []).slice(0, 4).map((skill) => (
+              <div key={skill.skillId} className="rounded-[1.4rem] border border-white/10 bg-white/[0.035] p-4">
+                <div className="mb-2 text-sm font-semibold text-white/82">{skill.name}</div>
+                <div className="line-clamp-2 text-xs leading-relaxed text-white/42">{skill.trigger}</div>
+                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-teal-200" style={{ width: `${Math.min(skill.score * 100, 100)}%` }} />
+                </div>
+              </div>
             ))}
           </div>
         </section>
 
-        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-4">
-          <div className="mb-5 text-sm font-semibold text-white/78">State Diff</div>
-          <StateDiffPanel diff={selectedEvidence.diff} />
-
-          <div className="mt-6 rounded-[1.4rem] border border-amber-200/15 bg-amber-200/[0.055] p-5">
-            <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-amber-100/70">
-              <MoonStar size={15} />
-              Dreaming Engine
-            </div>
-            <p className="text-sm leading-relaxed text-white/55">
-              {dream?.summary ?? '离线反思会读取近期 traces，沉淀长期记忆、Skill 调参建议和下一轮实验。'}
-            </p>
-            <button
-              onClick={handleDreaming}
-              disabled={isDreaming}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-200/20 bg-black/22 px-4 py-3 text-sm text-amber-50/78 transition hover:bg-amber-200/10 disabled:opacity-60"
+        <AnimatePresence>
+          {showEvidence && (
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="glass-panel col-span-12 rounded-[2rem] p-6"
             >
-              {isDreaming ? <Loader2 className="animate-spin" size={16} /> : <MoonStar size={16} />}
-              运行 Dreaming
-            </button>
-          </div>
-        </section>
-
-        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-4">
-          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white/78">
-            <Database size={18} className="text-amber-200" />
-            Retrieved Memory
-          </div>
-          <div className="space-y-3">
-            {trace.retrievedMemory.map((memory, index) => (
-              <div key={index} className="rounded-2xl border border-white/10 bg-black/22 p-4">
-                <div className="mb-2 flex justify-between gap-3">
-                  <span className="rounded-full bg-white/8 px-2 py-1 font-mono text-[10px] text-white/38">{memory.type}</span>
-                  <span className="font-mono text-xs text-teal-100">{Math.round(memory.confidence * 100)}%</span>
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-white/80">工程证据抽屉</div>
+                  <div className="mt-1 font-mono text-[10px] text-white/35">{selectedEvidence.subtitle}</div>
                 </div>
-                <div className="text-sm leading-relaxed text-white/62">{memory.content}</div>
+                <EvidenceTabs active={evidenceView} onChange={setEvidenceView} runCount={runSteps.length} feedbackCount={feedbackEvidence?.traceSteps?.length ?? 0} dreamCount={dream?.traceSteps?.length ?? 0} />
               </div>
-            ))}
-          </div>
-        </section>
 
-        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-4">
-          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white/78">
-            <WandSparkles size={18} className="text-teal-200" />
-            Selected Skills
-          </div>
-          <div className="space-y-3">
-            {trace.selectedSkills.map((skill) => (
-              <div key={skill.skillId} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-                <div className="flex justify-between gap-3">
-                  <div>
-                    <div className="font-semibold text-white/84">{skill.name}</div>
-                    <div className="mt-1 font-mono text-[10px] text-white/35">{skill.skillId}</div>
-                  </div>
-                  <div className="font-mono text-sm text-teal-100">{skill.score}</div>
+              <div className="grid grid-cols-12 gap-5">
+                <div className="col-span-12 space-y-3 lg:col-span-8">
+                  {selectedSteps.map((step, index) => (
+                    <TraceStepRow key={`${step.id}-${index}`} step={step} index={index} />
+                  ))}
                 </div>
-                <div className="mt-3 text-xs leading-relaxed text-white/42">{skill.trigger}</div>
+                <div className="col-span-12 lg:col-span-4">
+                  <StateDiffPanel diff={selectedEvidence.diff} latency={selectedEvidence.latency} title={selectedEvidence.title} />
+                </div>
               </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="glass-panel col-span-12 rounded-[2rem] p-6 lg:col-span-4">
-          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white/78">
-            <FileText size={18} className="text-indigo-200" />
-            File-system Memory
-          </div>
-          <div className="max-h-[320px] space-y-2 overflow-auto pr-1 custom-scroll">
-            {memoryFiles.length ? (
-              memoryFiles.slice(0, 10).map((file) => (
-                <div key={file.path} className="rounded-xl border border-white/10 bg-black/20 px-3 py-3">
-                  <div className="truncate font-mono text-xs text-indigo-100/78">{file.path}</div>
-                  <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-white/38">{file.content.replace(/---[\s\S]*?---/, '').trim().slice(0, 120)}</div>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed border-white/10 p-4 text-sm text-white/35">启动后端后会自动生成 memory vault。</div>
-            )}
-          </div>
-        </section>
+            </motion.section>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 };
 
-const evidenceOptions: Array<{
-  id: EvidenceView;
-  title: string;
-  label: string;
-  icon: LucideIcon;
-}> = [
-  { id: 'run', title: '主运行链路', label: 'Agent Run', icon: ServerCog },
-  { id: 'feedback', title: '反馈进化链路', label: 'Feedback', icon: MessageSquareHeart },
-  { id: 'dream', title: '梦境沉淀链路', label: 'Dreaming', icon: MoonStar },
-];
+const RuntimePill = ({ online }: { online: boolean }) => (
+  <div className="rounded-full border border-white/10 bg-black/28 px-4 py-2 text-xs text-white/55">
+    <span className={`mr-2 inline-block h-2 w-2 rounded-full ${online ? 'bg-emerald-300' : 'bg-amber-300'}`} />
+    {online ? 'LLM online' : 'Rule fallback'}
+  </div>
+);
 
-const EvidenceSwitcher = ({
+const Metric = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
+    <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/32">{label}</div>
+    <div className="mt-1 truncate text-sm text-white/76">{value}</div>
+  </div>
+);
+
+const CapabilityCard = ({
+  icon: Icon,
+  title,
+  subtitle,
+  value,
+  action,
+}: {
+  icon: LucideIcon;
+  title: string;
+  subtitle: string;
+  value: string;
+  action?: React.ReactNode;
+}) => (
+  <div className="glass-panel rounded-[1.5rem] p-5">
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex min-w-0 items-center gap-4">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-teal-200/20 bg-teal-200/8">
+          <Icon size={19} className="text-teal-100" />
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-bold text-white/84">{title}</div>
+          <div className="mt-1 truncate text-xs text-white/38">{subtitle}</div>
+        </div>
+      </div>
+      {action ?? <span className="shrink-0 rounded-full bg-white/8 px-3 py-1 font-mono text-xs text-white/45">{value}</span>}
+    </div>
+  </div>
+);
+
+const EvidenceTabs = ({
   active,
   onChange,
   runCount,
@@ -386,63 +372,35 @@ const EvidenceSwitcher = ({
   feedbackCount: number;
   dreamCount: number;
 }) => {
-  const counts: Record<EvidenceView, number> = {
-    run: runCount,
-    feedback: feedbackCount,
-    dream: dreamCount,
-  };
+  const tabs: Array<[EvidenceView, string, number]> = [
+    ['run', 'Agent Run', runCount],
+    ['feedback', 'Feedback', feedbackCount],
+    ['dream', 'Dreaming', dreamCount],
+  ];
 
   return (
-    <div className="mb-5 grid grid-cols-1 gap-3 xl:grid-cols-3">
-      {evidenceOptions.map((option) => {
-        const Icon = option.icon;
-        const isActive = option.id === active;
-        const count = counts[option.id];
-
-        return (
-          <button
-            key={option.id}
-            onClick={() => onChange(option.id)}
-            className={`group flex min-h-[72px] items-center justify-between rounded-[1.25rem] border px-5 py-4 text-left transition ${
-              isActive
-                ? 'border-teal-200/30 bg-teal-200/[0.09] shadow-[0_0_36px_rgba(94,234,212,.1)]'
-                : 'border-white/10 bg-white/[0.035] hover:border-white/18 hover:bg-white/[0.055]'
-            }`}
-          >
-            <div className="flex min-w-0 items-center gap-3">
-              <div
-                className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border ${
-                  isActive ? 'border-teal-200/35 bg-teal-200/12 text-teal-100' : 'border-white/10 bg-black/18 text-white/45'
-                }`}
-              >
-                <Icon size={18} />
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-bold text-white/82">{option.title}</div>
-                <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/32">{option.label}</div>
-              </div>
-            </div>
-            <div className={`rounded-full px-3 py-1 font-mono text-[11px] ${count ? 'bg-teal-200/12 text-teal-50/78' : 'bg-white/[0.055] text-white/32'}`}>
-              {count} steps
-            </div>
-          </button>
-        );
-      })}
+    <div className="flex gap-2">
+      {tabs.map(([id, label, count]) => (
+        <button
+          key={id}
+          onClick={() => onChange(id)}
+          className={`rounded-full border px-4 py-2 text-xs transition ${
+            active === id ? 'border-teal-200/35 bg-teal-200/12 text-teal-50' : 'border-white/10 bg-white/[0.035] text-white/45 hover:text-white'
+          }`}
+        >
+          {label} · {count}
+        </button>
+      ))}
     </div>
   );
 };
 
-const TraceStepRow = ({ step, index, active }: { step: TraceStep; index: number; active: boolean }) => {
+const TraceStepRow = ({ step, index }: { step: TraceStep; index: number }) => {
   const Icon = stepIconMap[step.type] ?? ServerCog;
   const ok = step.status === 'ok';
 
   return (
-    <motion.div
-      animate={{ opacity: active ? 1 : 0.45, scale: active ? 1 : 0.992 }}
-      className={`rounded-[1.25rem] border p-4 transition ${
-        active ? 'border-teal-200/22 bg-teal-200/[0.055]' : 'border-white/10 bg-white/[0.025]'
-      }`}
-    >
+    <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.025] p-4">
       <div className="flex items-start gap-4">
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-black/24">
           <Icon size={18} className="text-teal-100" />
@@ -468,7 +426,7 @@ const TraceStepRow = ({ step, index, active }: { step: TraceStep; index: number;
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -479,62 +437,24 @@ const TraceSummary = ({ title, value, danger = false }: { title: string; value: 
   </div>
 );
 
-const StateDiffPanel = ({ diff }: { diff?: HarnessStateDiff }) => {
-  if (!diff) {
-    return <div className="rounded-xl border border-dashed border-white/10 p-4 text-sm text-white/35">下一次真实 run 后会显示 state diff。</div>;
-  }
-
-  const totalDelta = diff.profile?.totalProgress?.delta ?? 0;
-  const subRealmChanges = diff.profile?.subRealms ?? [];
-  const skillEvolution = diff.skills?.evolution ?? [];
-
-  return (
-    <div className="space-y-3">
-      <DiffCard
-        label="Memory"
-        value={`${diff.memory?.beforeCount ?? 0} → ${diff.memory?.afterCount ?? 0}`}
-        detail={`added ${diff.memory?.added?.length ?? 0}, updated ${diff.memory?.updated?.length ?? 0}`}
-      />
-      <DiffCard
-        label="Profile"
-        value={`${totalDelta >= 0 ? '+' : ''}${totalDelta}%`}
-        detail={subRealmChanges.length ? subRealmChanges.map((item) => `${item.name} ${item.delta >= 0 ? '+' : ''}${item.delta}`).join(' / ') : 'no sub-realm delta'}
-      />
-      <DiffCard
-        label="Skills"
-        value={`${skillEvolution.length} changes`}
-        detail={skillEvolution.map((item) => `${item.param}: ${item.from} → ${item.to}`).join(' / ') || 'stable'}
-      />
+const StateDiffPanel = ({ diff, latency, title }: { diff?: HarnessStateDiff; latency?: number; title: string }) => (
+  <div className="space-y-3">
+    <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.035] p-4">
+      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">{title}</div>
+      <div className="text-xl font-black tracking-[-0.03em] text-white">{latency ?? 0}ms</div>
+      <div className="mt-2 text-xs leading-relaxed text-white/45">完整链路耗时</div>
     </div>
-  );
-};
+    {diff?.memory && <DiffCard label="Memory" value={`${diff.memory.beforeCount} -> ${diff.memory.afterCount}`} detail={`added ${diff.memory.added.length}, updated ${diff.memory.updated.length}`} />}
+    {diff?.profile && <DiffCard label="Profile" value={`${diff.profile.totalProgress?.delta ?? 0}%`} detail={(diff.profile.subRealms ?? []).map((item) => `${item.name} ${item.delta}`).join(' / ') || 'stable'} />}
+    {diff?.skills && <DiffCard label="Skills" value={`${diff.skills.evolution?.length ?? 0} changes`} detail={(diff.skills.evolution ?? []).map((item) => `${item.param}: ${item.from} -> ${item.to}`).join(' / ') || 'stable'} />}
+  </div>
+);
 
 const DiffCard = ({ label, value, detail }: { label: string; value: string; detail: string }) => (
   <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.035] p-4">
     <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">{label}</div>
     <div className="text-xl font-black tracking-[-0.03em] text-white">{value}</div>
     <div className="mt-2 line-clamp-3 text-xs leading-relaxed text-white/45">{detail}</div>
-  </div>
-);
-
-const RuntimeCard = ({
-  title,
-  value,
-  detail,
-  icon: Icon,
-}: {
-  title: string;
-  value: string;
-  detail: string;
-  icon: LucideIcon;
-}) => (
-  <div className="glass-panel rounded-[1.4rem] p-5">
-    <div className="mb-4 flex items-center justify-between">
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/35">{title}</div>
-      <Icon size={17} className="text-teal-100/72" />
-    </div>
-    <div className="truncate text-lg font-bold tracking-[-0.02em] text-white">{value}</div>
-    <div className="mt-1 truncate text-xs text-white/38">{detail}</div>
   </div>
 );
 
