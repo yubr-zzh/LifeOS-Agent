@@ -82,6 +82,22 @@ function title(slide, eyebrow, main, sub) {
   }
 }
 
+function sectionBadge(slide, part, step, label, color = C.cyan) {
+  slide.addShape(pptx.ShapeType.roundRect, {
+    x: 9.62, y: 0.52, w: 2.92, h: 0.46, rectRadius: 0.08,
+    fill: { color: '071426', transparency: 7 },
+    line: { color, transparency: 20, width: 1 },
+  });
+  slide.addText(`${part} / ${step}`, {
+    x: 9.84, y: 0.66, w: 0.72, h: 0.12, fontSize: 8.4, bold: true,
+    color, charSpacing: 1.2, margin: 0, align: 'center',
+  });
+  slide.addText(label, {
+    x: 10.7, y: 0.62, w: 1.62, h: 0.16, fontSize: 9.4, bold: true,
+    color: C.white, margin: 0, fit: 'shrink',
+  });
+}
+
 function pill(slide, text, x, y, w, color = C.cyan) {
   slide.addShape(pptx.ShapeType.roundRect, {
     x, y, w, h: 0.34, rectRadius: 0.06,
@@ -152,7 +168,48 @@ if (includeSlide()) {
 if (includeSlide()) {
   const slide = pptx.addSlide();
   addBg(slide);
+  title(slide, 'ROADMAP', '路演目录：三段式讲清 LifeOS Agent', '先讲为什么，再讲产品体验，最后讲 Agent 工程核心');
+  const sections = [
+    ['一', '为什么做', '需求与产品定位', [
+      '1. 长期独自学习的真实痛点',
+      '2. 修仙框架如何映射产品机制',
+      '3. 境界进度不是普通打卡',
+    ], C.cyan],
+    ['二', '怎么使用', '核心功能与体验', [
+      '1. 一段日记触发完整成长闭环',
+      '2. 洞府、长河、灵根与内核舱',
+      '3. Demo 主线与视觉记忆点',
+    ], C.violet],
+    ['三', '怎么实现', 'Agent 工程亮点', [
+      '1. Harness 可观测运行链路',
+      '2. Memory + Skills + 文件系统',
+      '3. Dreaming + Feedback 自进化',
+    ], C.gold],
+  ];
+  sections.forEach((s, i) => {
+    const x = 0.82 + i * 4.16;
+    card(slide, x, 2.05, 3.58, 3.75, { fill: i === 1 ? '101336' : '0B1732', line: s[4], lineWidth: 1.25 });
+    slide.addText(s[0], { x: x + 0.3, y: 2.36, w: 0.62, h: 0.48, fontSize: 31, bold: true, color: s[4], margin: 0, align: 'center' });
+    slide.addText(s[1], { x: x + 1.05, y: 2.38, w: 1.55, h: 0.25, fontSize: 18, bold: true, color: C.white, margin: 0 });
+    slide.addText(s[2], { x: x + 1.05, y: 2.77, w: 1.95, h: 0.18, fontSize: 10.6, color: C.muted, margin: 0 });
+    s[3].forEach((item, j) => {
+      slide.addShape(pptx.ShapeType.ellipse, { x: x + 0.42, y: 3.38 + j * 0.58, w: 0.22, h: 0.22, fill: { color: s[4], transparency: 18 }, line: { color: s[4], transparency: 20 } });
+      slide.addText(item, { x: x + 0.82, y: 3.34 + j * 0.58, w: 2.32, h: 0.18, fontSize: 10.6, color: 'D9E2F2', margin: 0, fit: 'shrink' });
+    });
+  });
+  slide.addText('路演节奏', { x: 0.9, y: 6.25, w: 1.1, h: 0.2, fontSize: 12, color: C.cyan, bold: true, margin: 0 });
+  slide.addText('4-5 分钟：需求 60s / 体验 90s / 工程 120s / 总结 30s。', {
+    x: 2.0, y: 6.22, w: 7.1, h: 0.22, fontSize: 13.5, color: C.white, bold: true, margin: 0,
+  });
+  footer(slide, 2);
+}
+
+// Slide 3
+if (includeSlide()) {
+  const slide = pptx.addSlide();
+  addBg(slide);
   title(slide, 'USER PAIN', '长期独自学习，不缺工具，缺一个会进化的陪伴者', '目标用户：长期自学、做项目、准备比赛、探索方向的学生 / 个人开发者');
+  sectionBadge(slide, '一', '1', '用户痛点', C.cyan);
   const pains = [
     ['记录碎片化', '今天写了什么、卡在哪里，很快变成散落信息。'],
     ['计划反复失败', '失败原因没有被系统性总结，下一次仍然踩坑。'],
@@ -170,14 +227,15 @@ if (includeSlide()) {
   slide.addText('一个人长期往前走时，需要的不是更多提醒，而是“记录他、理解他、复盘他，并和他一起进化”的智能体。', {
     x: 2.0, y: 6.0, w: 9.9, h: 0.34, fontSize: 15, color: C.white, bold: true, margin: 0, fit: 'shrink',
   });
-  footer(slide, 2);
+  footer(slide, 3);
 }
 
-// Slide 3
+// Slide 4
 if (includeSlide()) {
   const slide = pptx.addSlide();
   addBg(slide, 'purple');
   title(slide, 'PRODUCT POSITIONING', 'LifeOS：伴随式成长操作系统', '把修仙世界观映射为真实产品机制，而不是表层 gamification');
+  sectionBadge(slide, '一', '2-3', '产品定位', C.cyan);
   const mappings = [
     ['洞府', '个人成长工作台'],
     ['修炼日志', '日常输入 / 复盘'],
@@ -198,14 +256,15 @@ if (includeSlide()) {
   slide.addText('境界进度 ≠ 任务数量；而是稳定执行 + 复盘质量 + 项目推进 + 心魔改善 + Skill 熟练度。', {
     x: 2.72, y: 5.35, w: 8.9, h: 0.24, fontSize: 13.5, color: C.white, bold: true, margin: 0, fit: 'shrink',
   });
-  footer(slide, 3);
+  footer(slide, 4);
 }
 
-// Slide 4
+// Slide 5
 if (includeSlide()) {
   const slide = pptx.addSlide();
   addBg(slide);
   title(slide, 'CORE EXPERIENCE', '从一段日记，到一次完整 Agent 成长闭环', 'MVP 要稳定演示这一条链路：输入 -> 解析 -> 记忆 -> 技能 -> 反馈 -> 可视化');
+  sectionBadge(slide, '二', '1-2', '核心体验', C.violet);
   const flow = [
     ['Daily Input', 0.8, 2.55],
     ['Memory Retrieval', 2.72, 2.55],
@@ -228,14 +287,41 @@ if (includeSlide()) {
     slide.addText(c[0], { x: 1.25 + i * 4.08, y: 4.58, w: 1.5, h: 0.2, fontSize: 13, bold: true, color: [C.cyan, C.violet, C.gold][i], margin: 0 });
     slide.addText(c[1], { x: 1.25 + i * 4.08, y: 4.94, w: 2.85, h: 0.28, fontSize: 10.5, color: 'CBD5E1', margin: 0, fit: 'shrink' });
   });
-  footer(slide, 4);
+  footer(slide, 5);
 }
 
-// Slide 5
+// Slide 6
+if (includeSlide()) {
+  const slide = pptx.addSlide();
+  addBg(slide);
+  title(slide, 'VISUAL PRODUCT', '让成长被看见：洞府、长河、灵根与内核舱', '视觉不是装饰，而是把抽象成长过程变成可感知体验');
+  sectionBadge(slide, '二', '3', '视觉体验', C.violet);
+  const modules = [
+    ['洞府总览', '动态 Life Core、境界进度、当前心魔、修炼摘要'],
+    ['修炼日志', '居中输入、图片上传、提交后显示 Agent 解析'],
+    ['成长轨迹', '命运长河瀑布流、趋势图谱、灵根目录'],
+    ['内核舱', '产品化展示 Memory / Skills / Feedback / Dreaming'],
+  ];
+  modules.forEach((m, i) => {
+    const x = 0.85 + (i % 2) * 6.0;
+    const y = 2.0 + Math.floor(i / 2) * 1.56;
+    card(slide, x, y, 5.35, 1.08, { fill: '0B1530', line: i % 2 ? C.violet : C.cyan });
+    slide.addText(m[0], { x: x + 0.25, y: y + 0.25, w: 1.6, h: 0.22, fontSize: 15, bold: true, color: i % 2 ? C.violet : C.cyan, margin: 0 });
+    slide.addText(m[1], { x: x + 1.9, y: y + 0.25, w: 3.05, h: 0.35, fontSize: 10.6, color: C.white, margin: 0, fit: 'shrink' });
+  });
+  slide.addText('Demo 主线', { x: 0.9, y: 5.7, w: 1.3, h: 0.22, fontSize: 13, color: C.gold, bold: true, margin: 0 });
+  slide.addText('打开洞府 → 提交今日日志 → 查看 Agent 解析 → 一键闭环 → 进入内核舱看 Memory / Skills / Dreaming / Harness 证据', {
+    x: 2.1, y: 5.68, w: 10.0, h: 0.24, fontSize: 13, color: C.white, bold: true, margin: 0, fit: 'shrink',
+  });
+  footer(slide, 6);
+}
+
+// Slide 7
 if (includeSlide()) {
   const slide = pptx.addSlide();
   addBg(slide, 'purple');
   title(slide, 'AGENT ENGINEERING', '可追踪的 Agent 工程闭环', '核心不是界面，而是把每一次建议拆成可观测、可反馈、可进化的节点');
+  sectionBadge(slide, '三', '1', 'Harness', C.gold);
   card(slide, 4.72, 2.5, 3.9, 1.25, { fill: '091737', line: C.cyan, lineWidth: 1.4 });
   slide.addText('Agent Harness', { x: 5.05, y: 2.87, w: 3.2, h: 0.24, fontSize: 20, color: C.white, bold: true, align: 'center', margin: 0 });
   slide.addText('traceSteps / stateDiff / latency', { x: 5.18, y: 3.27, w: 2.9, h: 0.15, fontSize: 9.5, color: C.cyan, align: 'center', charSpacing: 1.2, margin: 0 });
@@ -254,14 +340,15 @@ if (includeSlide()) {
   slide.addText('每次 run 不只返回答案，还记录输入摘要、Memory 检索、Skill 选择、模型调用、评估、状态变化与持久化。', {
     x: 2.42, y: 6.22, w: 9.6, h: 0.24, fontSize: 13, color: C.white, margin: 0, fit: 'shrink',
   });
-  footer(slide, 5);
+  footer(slide, 7);
 }
 
-// Slide 6
+// Slide 8
 if (includeSlide()) {
   const slide = pptx.addSlide();
   addBg(slide);
   title(slide, 'MEMORY + SKILLS', '双循环：越懂你，也越会帮你', 'Memory 负责长期画像，Skills 负责可复用方法，两者都能被反馈更新');
+  sectionBadge(slide, '三', '2', 'Memory / Skills', C.gold);
   card(slide, 0.85, 2.0, 5.45, 3.55, { line: C.cyan });
   miniHeader(slide, 'Memory Store / 文件式系统内存', 1.12, 2.25, 'M', C.cyan);
   slide.addText('/memory-vault\n  /profile.md\n  /memories/*.md\n  /skills/*.md\n  /traces/*.md\n  /dreams/*.md', {
@@ -285,14 +372,15 @@ if (includeSlide()) {
   slide.addText('Skill Evolution 示例：planning.intensity 下调、taskGranularity -> micro', {
     x: 7.55, y: 5.05, w: 4.2, h: 0.22, fontSize: 10.5, color: C.gold, bold: true, margin: 0,
   });
-  footer(slide, 6);
+  footer(slide, 8);
 }
 
-// Slide 7
+// Slide 9
 if (includeSlide()) {
   const slide = pptx.addSlide();
   addBg(slide, 'purple');
   title(slide, 'SELF-EVOLUTION', '自进化不是玄学，是明确的反馈回路', 'Feedback + Dreaming + Harness Trace，让 Agent 的变化可以被解释');
+  sectionBadge(slide, '三', '3', '自进化', C.gold);
   const lanes = [
     ['Feedback Evolution', '用户评价计划太重 / 刚刚好 / 有帮助', '调整 Skill 参数与后续策略', C.cyan],
     ['Dreaming Mechanism', '离线读取近期 traces / logs / feedbacks', '沉淀长期模式与下一轮实验', C.violet],
@@ -310,39 +398,15 @@ if (includeSlide()) {
   slide.addText('最终形成：Daily Input -> Memory Retrieval -> Skill Selection -> Reflection -> Evaluation -> Memory Update -> Skill Evolution', {
     x: 2.3, y: 6.17, w: 8.75, h: 0.18, fontFace: 'Consolas', fontSize: 9.5, color: C.cyan, align: 'center', margin: 0,
   });
-  footer(slide, 7);
+  footer(slide, 9);
 }
 
-// Slide 8
-if (includeSlide()) {
-  const slide = pptx.addSlide();
-  addBg(slide);
-  title(slide, 'VISUAL PRODUCT', '让成长被看见：洞府、长河、灵根与内核舱', '视觉不是装饰，而是把抽象成长过程变成可感知体验');
-  const modules = [
-    ['洞府总览', '动态 Life Core、境界进度、当前心魔、修炼摘要'],
-    ['修炼日志', '居中输入、图片上传、提交后显示 Agent 解析'],
-    ['成长轨迹', '命运长河瀑布流、趋势图谱、灵根目录'],
-    ['内核舱', '产品化展示 Memory / Skills / Feedback / Dreaming'],
-  ];
-  modules.forEach((m, i) => {
-    const x = 0.85 + (i % 2) * 6.0;
-    const y = 2.0 + Math.floor(i / 2) * 1.56;
-    card(slide, x, y, 5.35, 1.08, { fill: '0B1530', line: i % 2 ? C.violet : C.cyan });
-    slide.addText(m[0], { x: x + 0.25, y: y + 0.25, w: 1.6, h: 0.22, fontSize: 15, bold: true, color: i % 2 ? C.violet : C.cyan, margin: 0 });
-    slide.addText(m[1], { x: x + 1.9, y: y + 0.25, w: 3.05, h: 0.35, fontSize: 10.6, color: C.white, margin: 0, fit: 'shrink' });
-  });
-  slide.addText('Demo 主线', { x: 0.9, y: 5.7, w: 1.3, h: 0.22, fontSize: 13, color: C.gold, bold: true, margin: 0 });
-  slide.addText('打开洞府 → 提交今日日志 → 查看 Agent 解析 → 一键闭环 → 进入内核舱看 Memory / Skills / Dreaming / Harness 证据', {
-    x: 2.1, y: 5.68, w: 10.0, h: 0.24, fontSize: 13, color: C.white, bold: true, margin: 0, fit: 'shrink',
-  });
-  footer(slide, 8);
-}
-
-// Slide 9
+// Slide 10
 if (includeSlide()) {
   const slide = pptx.addSlide();
   addBg(slide, 'purple');
   title(slide, 'WHY IT MATTERS', 'LifeOS Agent：让一个人的长期成长拥有反馈系统', '不是普通日程，不是一次性聊天，而是可记忆、可回放、可进化的个人 Agent');
+  sectionBadge(slide, '总结', '3→1', '价值收束', C.cyan);
   const claims = [
     ['产品价值', '解决独自学习/做项目时的长期陪伴、复盘与方向感问题。'],
     ['技术亮点', 'Agent Harness + Memory + Skills + Dreaming + 文件系统内存。'],
@@ -357,7 +421,7 @@ if (includeSlide()) {
     x: 1.25, y: 4.9, w: 10.8, h: 0.72, fontSize: 18, color: C.white, bold: true, align: 'center', margin: 0, fit: 'shrink',
   });
   slide.addText('Thank you', { x: 5.4, y: 6.25, w: 2.4, h: 0.3, fontSize: 18, color: C.cyan, bold: true, align: 'center', margin: 0 });
-  footer(slide, 9);
+  footer(slide, 10);
 }
 
 pptx.writeFile({ fileName: 'LifeOS-Agent-路演PPT.pptx' });
