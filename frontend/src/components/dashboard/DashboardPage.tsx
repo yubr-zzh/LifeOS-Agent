@@ -1,6 +1,20 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { Activity, ChevronDown, Flame, Sparkles, Target, Waves, type LucideIcon } from 'lucide-react';
+import {
+  Activity,
+  AudioLines,
+  Box,
+  ChevronDown,
+  Cloud,
+  Flame,
+  Folder,
+  Network,
+  Sparkles,
+  Star,
+  Target,
+  Waves,
+  type LucideIcon,
+} from 'lucide-react';
 import { mockData } from '../../lib/mockData';
 import { getLifeOSState, type LifeOSState } from '../../lib/api';
 import { Progress } from './ProgressBar';
@@ -96,83 +110,13 @@ const DashboardPage = () => {
       </div>
 
       <div className="grid grid-cols-12 gap-5">
-        <section className="glass-panel relative col-span-12 min-h-[520px] overflow-hidden rounded-[2rem] p-8 lg:col-span-7">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(94,234,212,.28),transparent_28%),radial-gradient(circle_at_52%_48%,rgba(246,199,104,.16),transparent_42%)]" />
-          <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(94,234,212,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(94,234,212,.08)_1px,transparent_1px)] [background-size:34px_34px]" />
+        <section className="glass-panel relative col-span-12 min-h-[560px] overflow-hidden rounded-[2rem] p-8 lg:col-span-7">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(94,234,212,.2),transparent_30%),radial-gradient(circle_at_58%_50%,rgba(167,139,250,.18),transparent_40%),radial-gradient(circle_at_46%_58%,rgba(96,165,250,.13),transparent_34%)]" />
+          <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(94,234,212,.075)_1px,transparent_1px),linear-gradient(90deg,rgba(94,234,212,.075)_1px,transparent_1px)] [background-size:34px_34px]" />
           <div className="absolute left-8 top-8 z-10 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs text-white/50 backdrop-blur-xl">动态洞府灵核</div>
 
-          <div className="absolute inset-x-12 bottom-12 top-20">
-            {Array.from({ length: 26 }).map((_, index) => {
-              const angle = (index / 26) * Math.PI * 2;
-              const radius = 38 + (index % 4) * 7;
-              return (
-                <motion.span
-                  key={`particle-${index}`}
-                  className="absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-full bg-teal-100 shadow-[0_0_18px_rgba(94,234,212,.95)]"
-                  style={{
-                    x: `${Math.cos(angle) * radius * 4}px`,
-                    y: `${Math.sin(angle) * radius * 2.6}px`,
-                  }}
-                  animate={{
-                    opacity: [0.22, 1, 0.22],
-                    scale: [0.65, 1.45, 0.65],
-                    rotate: 360,
-                  }}
-                  transition={{
-                    duration: 3.4 + (index % 5) * 0.35,
-                    repeat: Infinity,
-                    delay: index * 0.07,
-                  }}
-                />
-              );
-            })}
-
-            <div className="absolute left-1/2 top-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-teal-200/25" style={{ animation: 'pulse-ring 3.8s ease-out infinite' }} />
-            <div className="absolute left-1/2 top-1/2 h-[390px] w-[390px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-teal-100/18" style={{ animation: 'slow-spin 36s linear infinite reverse' }} />
-            <div className="absolute left-1/2 top-1/2 h-[470px] w-[470px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-amber-200/12" style={{ animation: 'slow-spin 28s linear infinite' }} />
-            <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-fuchsia-200/8" style={{ animation: 'slow-spin 52s linear infinite reverse' }} />
-
-            <motion.div
-              className="absolute left-1/2 top-1/2 grid h-64 w-64 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-teal-100/40 bg-gradient-to-br from-teal-200 via-cyan-200 to-indigo-300 shadow-[0_0_140px_rgba(94,234,212,.58)]"
-              animate={{
-                rotate: 360,
-                boxShadow: [
-                  '0 0 90px rgba(94,234,212,.42)',
-                  '0 0 150px rgba(246,199,104,.35)',
-                  '0 0 110px rgba(159,140,255,.42)',
-                  '0 0 90px rgba(94,234,212,.42)',
-                ],
-              }}
-              transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
-            >
-              <div className="grid h-40 w-40 place-items-center rounded-full border border-white/10 bg-[#05070c]/92 text-center shadow-inner">
-                <div>
-                  <div className="text-6xl font-black text-teal-100">OS</div>
-                  <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.24em] text-teal-100/52">Life Core</div>
-                </div>
-              </div>
-            </motion.div>
-
-            {subRealms.slice(0, 5).map((realm, index) => {
-              const angle = (index / 5) * Math.PI * 2 - Math.PI / 2;
-              const x = 50 + Math.cos(angle) * 38;
-              const y = 50 + Math.sin(angle) * 34;
-              return (
-                <motion.div
-                  key={realm.name}
-                  className="absolute w-36 rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-xl"
-                  style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ duration: 4 + index * 0.4, repeat: Infinity }}
-                >
-                  <div className="truncate text-xs text-white/70">{realm.name}</div>
-                  <div className="mt-1 font-mono text-[10px] text-white/35">{realm.level}</div>
-                  <div className="mt-2 h-1 overflow-hidden rounded bg-white/10">
-                    <div className="h-full rounded" style={{ width: `${realm.progress}%`, backgroundColor: realm.color }} />
-                  </div>
-                </motion.div>
-              );
-            })}
+          <div className="absolute inset-x-12 bottom-20 top-16">
+            <LifeCoreOrbit />
           </div>
 
           <div className="absolute bottom-8 left-8 right-8 z-10 grid grid-cols-3 gap-3">
@@ -323,6 +267,89 @@ const CompactPanel = ({
         {children}
       </motion.div>
     )}
+  </div>
+);
+
+const orbitModules: Array<{
+  id: string;
+  label: string;
+  hint: string;
+  icon: LucideIcon;
+  angle: number;
+  color: string;
+  glow: string;
+}> = [
+  { id: 'memory', label: 'Memory', hint: '结构化存储与回溯', icon: Box, angle: -90, color: '#5eead4', glow: 'rgba(94,234,212,.55)' },
+  { id: 'skills', label: 'Skills', hint: '持续学习与构建', icon: Star, angle: -6, color: '#a78bfa', glow: 'rgba(167,139,250,.58)' },
+  { id: 'dreaming', label: 'Dreaming', hint: '想象推演与未来模拟', icon: Cloud, angle: 58, color: '#60a5fa', glow: 'rgba(96,165,250,.56)' },
+  { id: 'harness', label: 'Harness', hint: '调度工具与行动落地', icon: Network, angle: 132, color: '#a78bfa', glow: 'rgba(167,139,250,.5)' },
+  { id: 'filesystem', label: 'File-system', hint: '统一管理与输出', icon: Folder, angle: 205, color: '#5eead4', glow: 'rgba(94,234,212,.5)' },
+];
+
+const LifeCoreOrbit = () => (
+  <div className="life-core-stage">
+    <div className="life-core-orbit orbit-outer" />
+    <div className="life-core-orbit orbit-main" />
+    <div className="life-core-orbit orbit-inner" />
+
+    {Array.from({ length: 34 }).map((_, index) => {
+      const angle = (index / 34) * Math.PI * 2;
+      const radius = 150 + (index % 5) * 19;
+      return (
+        <motion.span
+          key={`life-core-particle-${index}`}
+          className="life-core-particle"
+          style={{
+            x: `${Math.cos(angle) * radius}px`,
+            y: `${Math.sin(angle) * radius * 0.78}px`,
+          }}
+          animate={{ opacity: [0.18, 0.88, 0.18], scale: [0.55, 1.25, 0.55] }}
+          transition={{ duration: 2.6 + (index % 6) * 0.32, repeat: Infinity, delay: index * 0.055 }}
+        />
+      );
+    })}
+
+    <motion.div
+      className="life-core-center"
+      animate={{ y: [0, -10, 0], scale: [1, 1.025, 1] }}
+      transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut' }}
+      whileHover={{ scale: 1.08 }}
+    >
+      <div className="life-core-drop">
+        <AudioLines size={46} strokeWidth={2.2} />
+      </div>
+    </motion.div>
+
+    <div className="life-core-node-layer">
+      {orbitModules.map((mod) => {
+        const Icon = mod.icon;
+        return (
+          <motion.button
+            key={mod.id}
+            type="button"
+            className="life-core-node group"
+            style={
+              {
+                '--angle': `${mod.angle}deg`,
+                '--counter-angle': `${-mod.angle}deg`,
+                '--node-color': mod.color,
+                '--node-glow': mod.glow,
+              } as CSSProperties
+            }
+            whileHover={{ scale: 1.16, zIndex: 12 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+          >
+            <span className="life-core-node-icon">
+              <Icon size={28} strokeWidth={2.1} />
+            </span>
+            <span className="life-core-tooltip">
+              <span>{mod.label}</span>
+              <small>{mod.hint}</small>
+            </span>
+          </motion.button>
+        );
+      })}
+    </div>
   </div>
 );
 
