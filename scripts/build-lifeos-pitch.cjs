@@ -144,7 +144,7 @@ if (includeSlide()) {
   slide.addShape(pptx.ShapeType.ellipse, { x: 8.42, y: 1.6, w: 2.86, h: 2.86, fill: { color: '111B3B', transparency: 8 }, line: { color: C.violet, transparency: 20, width: 1.5 } });
   slide.addText('OS', { x: 9.05, y: 2.32, w: 1.6, h: 0.65, fontSize: 44, bold: true, color: C.white, align: 'center', margin: 0 });
   slide.addText('LIFE CORE', { x: 9.13, y: 3.05, w: 1.45, h: 0.16, fontSize: 8.5, color: C.cyan, align: 'center', charSpacing: 1.8, margin: 0 });
-  slide.addText('修仙是框架，Agent 工程是核心', { x: 8.15, y: 5.55, w: 3.45, h: 0.28, fontSize: 15, bold: true, color: C.gold, align: 'center', margin: 0 });
+  slide.addText('融修仙之框架，铸Agent工程之核', { x: 7.35, y: 5.55, w: 4.95, h: 0.28, fontSize: 15, bold: true, color: C.gold, align: 'center', margin: 0, fit: 'shrink' });
   footer(slide, 1);
 }
 
