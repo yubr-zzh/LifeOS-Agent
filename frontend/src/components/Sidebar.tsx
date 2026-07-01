@@ -1,4 +1,4 @@
-import { BookOpen, BrainCircuit, Home, LineChart, Zap } from 'lucide-react';
+import { BookOpen, BrainCircuit, Home, LineChart, MoonStar, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface SidebarProps {
@@ -10,6 +10,7 @@ const navItems = [
   { id: 'dashboard', label: '洞府总览', hint: 'Realm OS', icon: Home },
   { id: 'journal', label: '修炼日志', hint: 'Daily Loop', icon: BookOpen },
   { id: 'timeline', label: '成长轨迹', hint: 'Time River', icon: LineChart },
+  { id: 'dreaming', label: 'Dreaming', hint: 'Autonomous', icon: MoonStar },
   { id: 'harness', label: 'Harness 面板', hint: 'Agent Core', icon: Zap },
 ];
 

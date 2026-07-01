@@ -297,6 +297,95 @@
   transform: translateX(-50%) translateY(0);
 }
 
+.dream-orbit {
+  position: relative;
+  display: grid;
+  width: 310px;
+  height: 310px;
+  place-items: center;
+  border-radius: 999px;
+  transform-style: preserve-3d;
+}
+
+.dream-orbit::before {
+  content: "";
+  position: absolute;
+  inset: -46px;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle, rgba(167, 139, 250, 0.18), transparent 48%),
+    conic-gradient(from 40deg, transparent, rgba(94, 234, 212, 0.22), transparent 34%, rgba(167, 139, 250, 0.2), transparent 72%);
+  animation: slow-spin 18s linear infinite;
+}
+
+.dream-orbit-ring {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.dream-orbit .ring-a {
+  width: 290px;
+  height: 290px;
+  border: 1px solid rgba(167, 139, 250, 0.32);
+  animation: slow-spin 16s linear infinite;
+}
+
+.dream-orbit .ring-b {
+  width: 220px;
+  height: 220px;
+  border: 1px dashed rgba(94, 234, 212, 0.24);
+  animation: slow-spin 11s linear infinite reverse;
+}
+
+.dream-core {
+  position: relative;
+  z-index: 4;
+  display: grid;
+  width: 126px;
+  height: 126px;
+  place-items: center;
+  border: 1px solid rgba(167, 139, 250, 0.42);
+  border-radius: 42% 58% 50% 50% / 55% 48% 52% 45%;
+  color: #ddd6fe;
+  background:
+    radial-gradient(circle at 38% 28%, rgba(255, 255, 255, 0.28), transparent 17%),
+    linear-gradient(145deg, rgba(167, 139, 250, 0.86), rgba(11, 20, 56, 0.95) 62%);
+}
+
+.dream-source {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 5;
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  transform-origin: 0 0;
+  translate: -50% -50%;
+}
+
+.dream-source > div {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border: 1px solid rgba(94, 234, 212, 0.24);
+  border-radius: 999px;
+  color: #99f6e4;
+  background: rgba(4, 7, 18, 0.82);
+  box-shadow: 0 0 30px rgba(94, 234, 212, 0.18);
+  transform: translateX(150px);
+  backdrop-filter: blur(16px);
+}
+
+.dream-source span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  color: rgba(248, 250, 252, 0.64);
+}
+
 .lifeos-shell {
   color: var(--ink);
   background: var(--shell-bg);
