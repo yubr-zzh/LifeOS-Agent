@@ -77,7 +77,6 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-black/35">
           <div className="h-full w-[56%] rounded-full bg-gradient-to-r from-teal-200 via-amber-200 to-rose-300" />
         </div>
-        <div className="mt-3 text-[11px] leading-relaxed text-white/45">稳定执行、复盘质量、项目推进、心魔改善与 Skill 熟练度共同决定成长。</div>
       </div>
     </aside>
   );

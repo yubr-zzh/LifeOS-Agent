@@ -119,15 +119,15 @@ const DashboardPage = () => {
             <LifeCoreOrbit />
           </div>
 
-          <div className="absolute bottom-8 left-8 right-8 z-10 grid grid-cols-3 gap-3">
+          <div className="absolute bottom-3 left-12 right-12 z-10 grid grid-cols-3 gap-2">
             {[
               ['Trace', latestTrace?.traceId ?? 'mock trace'],
               ['Memory', `${state?.memories?.length ?? 2} entries`],
               ['Dreams', `${state?.dreams?.length ?? 0} reports`],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-2xl border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-xl">
-                <div className="text-[10px] uppercase tracking-[0.22em] text-white/32">{label}</div>
-                <div className="mt-1 truncate text-sm text-white/78">{value}</div>
+              <div key={label} className="rounded-xl border border-white/10 bg-black/28 px-3 py-2 backdrop-blur-xl">
+                <div className="text-[9px] uppercase tracking-[0.2em] text-white/28">{label}</div>
+                <div className="mt-0.5 truncate text-xs text-white/66">{value}</div>
               </div>
             ))}
           </div>
