@@ -6,10 +6,8 @@ import {
   Database,
   FileText,
   GitCompareArrows,
-  Loader2,
   MessageSquareHeart,
   MoonStar,
-  Play,
   ServerCog,
   Sparkles,
   WandSparkles,
@@ -21,7 +19,6 @@ import {
   getLifeOSState,
   getMemoryFiles,
   getRuntimeConfig,
-  runDemoMode,
   runDreaming,
   type DreamReport,
   type HarnessStateDiff,
@@ -59,7 +56,6 @@ const HarnessPage = () => {
   const [memoryFiles, setMemoryFiles] = useState<MemoryFile[]>([]);
   const [evidenceView, setEvidenceView] = useState<EvidenceView>('run');
   const [showEvidence, setShowEvidence] = useState(false);
-  const [isDemoRunning, setIsDemoRunning] = useState(false);
   const [isDreaming, setIsDreaming] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -116,25 +112,6 @@ const HarnessPage = () => {
   const selectedSteps = selectedEvidence.steps.length ? selectedEvidence.steps : buildEmptyEvidenceStep(selectedEvidence.title);
   const modelCall = trace.modelCalls?.[0] ?? dream?.modelCalls?.[0];
 
-  const handleDemoMode = async () => {
-    setIsDemoRunning(true);
-    setStatus(null);
-    try {
-      const result = await runDemoMode();
-      setTrace(result.run.harnessTrace as HarnessTrace);
-      setDream(result.dream);
-      setFeedbackEvidence(result.feedback.feedback);
-      setMemoryFiles(result.memoryFiles);
-      localStorage.setItem('lifeos:lastRun', JSON.stringify(result.run));
-      setStatus(`LifeOS 闭环完成：${result.run.harnessTrace.traceId}`);
-    } catch (error) {
-      console.warn('Demo mode failed', error);
-      setStatus('Demo 调用失败，请确认后端已启动。');
-    } finally {
-      setIsDemoRunning(false);
-    }
-  };
-
   const handleDreaming = async () => {
     setIsDreaming(true);
     setStatus(null);
@@ -166,23 +143,6 @@ const HarnessPage = () => {
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/45">
               这里不是调试台，而是你的伴随式 Agent 中枢。它把日常输入转化为记忆、技能选择、反馈进化与 Dreaming 沉淀。
             </p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={handleDemoMode}
-              disabled={isDemoRunning}
-              className="flex items-center gap-2 rounded-2xl bg-teal-200 px-5 py-4 font-bold text-black transition hover:bg-teal-100 disabled:opacity-60"
-            >
-              {isDemoRunning ? <Loader2 className="animate-spin" size={18} /> : <Play size={18} />}
-              一键演示闭环
-            </button>
-            <button
-              onClick={() => setShowEvidence((value) => !value)}
-              className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-5 py-4 text-white/74 transition hover:border-teal-200/25 hover:text-white"
-            >
-              <GitCompareArrows size={18} />
-              工程证据
-            </button>
           </div>
         </div>
       </div>
