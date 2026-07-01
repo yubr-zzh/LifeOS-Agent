@@ -224,7 +224,7 @@ const JournalPage = () => {
             先把今天的学习、项目推进、情绪和卡点交给 LifeOS。提交后，Agent 会生成复盘、明日计划、记忆更新与反馈进化入口。
           </p>
         </div>
-        <div className="relative z-30 mt-1 shrink-0 lg:mr-44">
+        <div className="relative z-30 mt-8 shrink-0 lg:mr-12">
           <button
             onClick={() => setHistoryOpen((open) => !open)}
             className="group flex items-center gap-3 rounded-full border border-white/10 bg-black/35 px-4 py-3 text-sm font-semibold text-white/72 shadow-2xl shadow-black/25 backdrop-blur-xl transition hover:border-teal-200/30 hover:bg-teal-200/10 hover:text-teal-50"
