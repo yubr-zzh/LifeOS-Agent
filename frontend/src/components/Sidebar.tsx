@@ -72,7 +72,10 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
       <div className="rounded-2xl border border-amber-200/15 bg-amber-200/[0.055] p-4">
         <div className="flex items-center justify-between text-xs">
           <span className="text-amber-100/80">当前境界</span>
-          <span className="gold-chip rounded-full px-3 py-1 font-semibold">练气六层</span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[11px] text-white/45">56%</span>
+            <span className="gold-chip rounded-full px-3 py-1 font-semibold">练气六层</span>
+          </div>
         </div>
         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-black/35">
           <div className="h-full w-[56%] rounded-full bg-gradient-to-r from-teal-200 via-amber-200 to-rose-300" />

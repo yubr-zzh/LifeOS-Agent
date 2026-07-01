@@ -29,6 +29,13 @@ const ruleSections = [
     formula: '境界进度 = 稳定执行 25% + 复盘质量 20% + 项目推进 20% + 心魔改善 15% + Skill 熟练度 10% + 长期目标一致性 10%',
     evidence: ['连续日志与复盘质量', '项目推进记录与突破节点', '心魔强度下降趋势', 'Skill 调用效果与反馈评分'],
     ui: ['洞府首页展示总境界', '成长轨迹展示子境界', '突破节点写入命运长河'],
+    levels: [
+      '练气期：一层 至 十三层',
+      '筑基期：初期 / 初期巅峰 / 中期 / 中期巅峰 / 后期 / 后期巅峰',
+      '结丹期：初期 / 初期巅峰 / 中期 / 中期巅峰 / 后期 / 后期巅峰',
+      '元婴期：初期 / 初期巅峰 / 中期 / 中期巅峰 / 后期 / 后期巅峰',
+      '化神期：初期 / 初期巅峰 / 中期 / 中期巅峰 / 后期 / 后期巅峰',
+    ],
   },
   {
     title: '灵根组合',
@@ -41,6 +48,7 @@ const ruleSections = [
     formula: '根雷达 = 当前长期目标 + 子境界进度 + 近期日志主题 + Agent 识别到的能力倾向',
     evidence: ['AI Agent 技术栈、项目实战、算法能力等子境界', '每周一次组合调整记录', '子雷达维度与对应文件目录'],
     ui: ['成长轨迹页展示灵根阵盘', '点击维度进入子雷达', '历史灵根组合可回看'],
+    levels: [],
   },
   {
     title: 'Agent 运行',
@@ -53,6 +61,7 @@ const ruleSections = [
     formula: 'Daily Input -> Memory Retrieval -> Skill Selection -> Reflection / Plan -> Evaluation -> Memory Update -> Skill Evolution',
     evidence: ['traceSteps 节点耗时与状态', 'retrievedMemory 与 selectedSkills', 'stateDiff 中的 Memory/Profile/Skill 变化'],
     ui: ['Harness 内核舱展示链路证据', 'Journal 提交后同步更新 trace', '反馈与 Dreaming 复用同一证据结构'],
+    levels: [],
   },
   {
     title: 'Dreaming 与记忆',
@@ -65,6 +74,7 @@ const ruleSections = [
     formula: 'Dreaming = 近期日志 + Harness traces + 用户反馈 -> 长期 Memory / Skill 参数 / 下一轮实验',
     evidence: ['memory-vault/profile.md', 'memories/*.md 与 skills/*.md', 'dreams/*.md 离线报告'],
     ui: ['Dreaming 页面展示后台凝练', 'Harness 页面可回放 Dreaming 证据', 'Memory 文件列表支持审查'],
+    levels: [],
   },
 ];
 
@@ -85,7 +95,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [themeOpen, setThemeOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
-  const [activeRule, setActiveRule] = useState(0);
+  const [activeRule, setActiveRule] = useState<number | null>(null);
   const [chromeHidden, setChromeHidden] = useState(false);
   const [visualTheme, setVisualTheme] = useState<VisualTheme>(() => {
     const cached = localStorage.getItem('lifeos:theme') as VisualTheme | null;
@@ -161,7 +171,7 @@ export default function App() {
               onClick={() => {
                 setRulesOpen((value) => !value);
                 setThemeOpen(false);
-                setActiveRule(0);
+                setActiveRule(null);
               }}
               title="规则设定"
               className="flex h-11 items-center gap-2 rounded-full border border-white/10 bg-black/42 px-4 text-xs font-semibold text-white/68 shadow-[0_16px_44px_rgba(0,0,0,.28)] backdrop-blur-2xl transition hover:border-amber-200/30 hover:bg-amber-200/10 hover:text-amber-50"
@@ -176,7 +186,7 @@ export default function App() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -8, scale: 0.96 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute right-0 mt-3 w-[520px] overflow-hidden rounded-[1.45rem] border border-amber-200/14 bg-[#070b12]/92 shadow-[0_28px_90px_rgba(0,0,0,.46)] backdrop-blur-2xl"
+                  className={`absolute right-0 mt-3 overflow-hidden rounded-[1.45rem] border border-amber-200/14 bg-[#070b12]/92 shadow-[0_28px_90px_rgba(0,0,0,.46)] backdrop-blur-2xl ${activeRule === null ? 'w-[360px]' : 'w-[560px]'}`}
                 >
                   <div className="border-b border-white/10 bg-amber-200/[0.045] px-5 py-4">
                     <div className="flex items-center gap-2 text-sm font-bold text-white/82">
@@ -187,35 +197,35 @@ export default function App() {
                       这里说明系统如何把日常记录转化为境界、灵根、记忆与自进化反馈。
                     </div>
                   </div>
-                  <div className="grid max-h-[600px] grid-cols-[190px_1fr] overflow-hidden">
-                    <div className="space-y-2 border-r border-white/10 p-3">
-                      {ruleSections.map((section, index) => {
-                        const active = activeRule === index;
-                        return (
-                          <button
-                            key={section.title}
-                            onClick={() => setActiveRule(index)}
-                            className={`w-full rounded-2xl border p-3 text-left transition ${
-                              active
-                                ? 'border-amber-200/30 bg-amber-200/[0.09] text-white'
-                                : 'border-white/8 bg-white/[0.025] text-white/52 hover:border-white/16 hover:text-white'
-                            }`}
-                          >
-                            <div className="mb-2 flex items-center justify-between gap-2">
-                              <span className="text-sm font-bold">{section.title}</span>
-                              <ChevronRight size={14} className={active ? 'text-amber-100' : 'text-white/25'} />
-                            </div>
-                            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/30">{section.tag}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="min-h-0 overflow-auto p-4 custom-scroll">
-                      <AnimatePresence mode="wait">
+                  <div className="max-h-[620px] overflow-auto p-3 custom-scroll">
+                    <AnimatePresence mode="wait">
+                      {activeRule === null ? (
+                        <motion.div
+                          key="rule-list"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.18 }}
+                          className="space-y-2"
+                        >
+                          {ruleSections.map((section, index) => (
+                            <button
+                              key={section.title}
+                              onClick={() => setActiveRule(index)}
+                              className="w-full rounded-2xl border border-white/8 bg-white/[0.025] p-4 text-left text-white/60 transition hover:border-amber-200/24 hover:bg-amber-200/[0.07] hover:text-white"
+                            >
+                              <div className="mb-2 flex items-center justify-between gap-3">
+                                <span className="text-sm font-bold">{section.title}</span>
+                                <ChevronRight size={15} className="text-amber-100/55" />
+                              </div>
+                              <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/30">{section.tag}</div>
+                            </button>
+                          ))}
+                        </motion.div>
+                      ) : (
                         <motion.div
                           key={ruleSections[activeRule].title}
-                          initial={{ opacity: 0, x: 12 }}
+                          initial={{ opacity: 0, x: 14 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: -8 }}
                           transition={{ duration: 0.18 }}
@@ -226,9 +236,9 @@ export default function App() {
                               <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-amber-100/48">{ruleSections[activeRule].tag} Setting</div>
                             </div>
                             <button
-                              onClick={() => setRulesOpen(false)}
+                              onClick={() => setActiveRule(null)}
                               className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-white/[0.035] text-white/45 transition hover:text-white"
-                              title="关闭"
+                              title="返回"
                             >
                               <ChevronLeft size={15} />
                             </button>
@@ -242,6 +252,19 @@ export default function App() {
                             <div className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-amber-100/68">核心公式</div>
                             <div className="font-mono text-[11px] leading-relaxed text-white/68">{ruleSections[activeRule].formula}</div>
                           </div>
+
+                          {ruleSections[activeRule].levels.length > 0 && (
+                            <div className="mt-3 rounded-2xl border border-teal-200/14 bg-teal-200/[0.045] p-4">
+                              <div className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-teal-100/70">完整境界划分</div>
+                              <div className="space-y-2">
+                                {ruleSections[activeRule].levels.map((level) => (
+                                  <div key={level} className="rounded-xl border border-white/8 bg-black/18 px-3 py-2 text-xs leading-relaxed text-white/60">
+                                    {level}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
                           <div className="mt-3 grid grid-cols-2 gap-3">
                             <RuleDetailList title="证据来源" items={ruleSections[activeRule].evidence} />
@@ -260,8 +283,8 @@ export default function App() {
                             </div>
                           </div>
                         </motion.div>
-                      </AnimatePresence>
-                    </div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </motion.div>
               )}
