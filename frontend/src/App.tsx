@@ -4,6 +4,7 @@ import { BookOpenCheck, ChevronLeft, ChevronRight, Palette, ScrollText } from 'l
 import Sidebar from './components/Sidebar';
 import DashboardPage from './components/dashboard/DashboardPage';
 import DreamingPage from './components/dreaming/DreamingPage';
+import FeedbackPage from './components/feedback/FeedbackPage';
 import JournalPage from './components/journal/JournalPage';
 import TimelinePage from './components/timeline/TimelinePage';
 import HarnessPage from './components/harness/HarnessPage';
@@ -149,6 +150,8 @@ export default function App() {
         return <TimelinePage />;
       case 'dreaming':
         return <DreamingPage />;
+      case 'feedback':
+        return <FeedbackPage />;
       case 'harness':
         return <HarnessPage />;
       default:
